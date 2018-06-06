@@ -8,6 +8,7 @@ project(asl_flight)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  std_msgs
   roscpp
   rospy
   mavros
@@ -139,7 +140,8 @@ include_directories(
 
 add_executable(asl_traj_ctrl
   src/asl_traj_ctrl.cpp
-  src/control/se3controller.cpp)
+  src/control/se3controller.cpp
+  src/trajectory/circle_trajectory.cpp)
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
 

@@ -19,6 +19,7 @@ private:
   ros::Subscriber joySub;
 
   Eigen::Matrix4d W;
+  Eigen::Matrix3d J;
 
   double fzCmd; // result of SE3 controller computation
   Eigen::Vector3d tauCmd; // result of SE3 controller computation
@@ -42,11 +43,11 @@ public:
   void updatePose(const Eigen::Vector3d &r, const Eigen::Matrix3d &R);
   void updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w);
   void calcSE3(
-          const Eigen::Vector3d &r_euler,
-          const Eigen::Vector3d &r_wb,
+          const double &yaw_des,
           const Eigen::Vector3d &r_pos,
           const Eigen::Vector3d &r_vel,
-          const Eigen::Vector3d &r_acc);
+          const Eigen::Vector3d &r_acc,
+          const Eigen::Vector3d &r_jer);
   void joySE3(void); // give reference input to SE3 controller from joystick. This enables manual joystick control
 };
 

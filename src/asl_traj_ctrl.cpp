@@ -1,5 +1,6 @@
 #include <iostream>
 #include <control/se3controller.h>
+#include <trajectory/trajectory.h>
 #include "mavros_msgs/ActuatorControl.h"
 #include <mavros_msgs/State.h>
 #include <string>
@@ -9,7 +10,7 @@
 #define TAKEOFF_TIME 5.0
 
 // Measured states
-mavros_msgs::State current_state;
+std::string current_mode;
 Eigen::Matrix3d mea_R;
 Eigen::Vector3d mea_wb;
 Eigen::Vector3d mea_pos;
@@ -17,7 +18,7 @@ Eigen::Vector3d mea_vel;
 
 void state_cb(const mavros_msgs::State::ConstPtr& msg)
 {
-    current_state = *msg;
+    current_mode = msg->mode;
 }
 
 void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
@@ -70,8 +71,28 @@ int main(int argc, char **argv)
   // Define controller classes
   SE3Controller se3ctrl;
 
+  // Define trajectory class
+  Trajectory* traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/10.0));
+  /*
+    std::string TRAJ;
+    nh.getParam("traj_type", traj_type);
+    if (traj_type == "POLY")
+    {
+        traj = new PolyTrajectory(CALIB_END, POLY_SCALE);
+    }
+    else if (traj_type == "HOVER")
+    {
+        traj = new ConstTrajectory(12,0.0);
+    }
+    else if (traj_type == "CIRCLE")
+    {
+        VectorXd start_pos(3);
+        traj = new CircleTrajectory(CALIB_END,1.0, 2.0*3.1416*(1/10.0), start_pos);
+    }
+  */
+
   // Controller frequency
-  ros::Rate rate(200.0);
+  ros::Rate rate(250.0);
 
   // Tracking status variables
   bool traj_started = false;
@@ -79,11 +100,11 @@ int main(int argc, char **argv)
   double time_traj = 0.0;
   double dt = 0.0;
 
-  Eigen::Vector3d r_euler(0, 0, 0);
-  Eigen::Vector3d r_wb(0, 0, 0);
-  Eigen::Vector3d r_pos(1.0, 0, -1.0);
+  double yaw_des = 0.0;
+  Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);
+  Eigen::Vector3d r_jer(0, 0, 0);
 
   while(ros::ok()) {
 
@@ -91,11 +112,20 @@ int main(int argc, char **argv)
     dt = ros::Time::now().toSec() - time_prev;
     time_prev = ros::Time::now().toSec();
 
-    if (current_state.mode == "OFFBOARD") {
+    //ROS_INFO_STREAM("mode: " << current_mode);
+
+    if (current_mode == "OFFBOARD") {
       if (!traj_started){
           traj_started = true;
+          time_traj = 0.0;
+
+          ROS_INFO("offboard started");
+
           // set takeoff hover point
           r_pos << mea_pos(0)+1.0, mea_pos(1), mea_pos(2)-1.0;
+
+          // set start point for trajectory
+          traj->set_start_pos(r_pos);
       } else {
           time_traj += dt;
       }
@@ -104,12 +134,18 @@ int main(int argc, char **argv)
       traj_started = false;
       time_traj = 0.0;
     }
+
+    // Once past initial wait time, overwrite reference
+    if (time_traj > TAKEOFF_TIME) {
+      ROS_INFO("error: %.2f", (r_pos-mea_pos).norm());
+      traj->eval(time_traj-TAKEOFF_TIME, r_pos, r_vel, r_acc, r_jer);
+    }
     // Update controller internal state
     se3ctrl.updatePose(mea_pos, mea_R);
     se3ctrl.updateVel(mea_vel, mea_wb);
-    
+
     // compute control effort
-    se3ctrl.calcSE3(r_euler, r_wb, r_pos, r_vel, r_acc);
+    se3ctrl.calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
 
     // publish commands
     cmd.header.stamp = ros::Time::now();
