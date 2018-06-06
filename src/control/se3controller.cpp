@@ -1,10 +1,11 @@
-#include <se3controller.h>
+#include <control/se3controller.h>
 #include <Eigen/Dense>
 
 
 SE3Controller::SE3Controller(void):
     MODEL("aslquad"), KP(4.0), KV(6.0), KR(0.3), KW(0.05),
-    M(1.04), g(9.8), TCOEFF(4.4) {
+    M(1.04), g(9.8), TCOEFF(4.4), mea_pos(0,0,0), mea_vel(0,0,0),
+    mea_wb(0,0,0) {
   // handle ros parameters
   ros::param::get("~KP", KP);
   ros::param::get("~KV", KV);
@@ -29,6 +30,8 @@ SE3Controller::SE3Controller(void):
     ROS_ERROR("Unknown model name!");
   }
 
+  mea_R = Eigen::Matrix3d::Identity();
+
 
   std::cout << "Using the following parameters: " << std::endl;
   std::cout << "KP = " << KP << std::endl;
@@ -39,42 +42,17 @@ SE3Controller::SE3Controller(void):
   std::cout << "TCOEFF = " << TCOEFF << std::endl;
   std::cout << "MODEL: " << MODEL << std::endl;
 
-  poseSub = nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &SE3Controller::poseSubCB, this);
-  velSub = nh.subscribe<geometry_msgs::TwistStamped>("/mavros/local_position/velocity", 1, &SE3Controller::velSubCB, this);
-  actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
-
   joySub = nh.subscribe<sensor_msgs::Joy>("/joy", 10, &SE3Controller::joyCB, this);
 }
 
-void SE3Controller::poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
-  // By default, MAVROS gives local_position/pose in ENU
-  mea_pos(0) = msg->pose.position.x;
-  mea_pos(1) = -msg->pose.position.y;
-  mea_pos(2) = -msg->pose.position.z;
-
-  double q1 = msg->pose.orientation.w;
-  double q2 = msg->pose.orientation.x;
-  double q3 = -msg->pose.orientation.y;
-  double q4 = -msg->pose.orientation.z;
-  double q1s = q1*q1;
-  double q2s = q2*q2;
-  double q3s = q3*q3;
-  double q4s = q4*q4;
-
-  mea_R <<
-    q1s+q2s-q3s-q4s, 2.0*(q2*q3-q1*q4) ,2.0*(q2*q4+q1*q3),
-    2.0*(q2*q3+q1*q4), q1s-q2s+q3s-q4s, 2.0*(q3*q4-q1*q2),
-    2.0*(q2*q4-q1*q3), 2.0*(q3*q4+q1*q2), q1s-q2s-q3s+q4s;
+void SE3Controller::updatePose(const Eigen::Vector3d &r, const Eigen::Matrix3d &R) {
+  mea_pos = r;
+  mea_R = R;
 }
 
-void SE3Controller::velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
-  // By default, MAVROS gives local_position/velocity in ENU
-  mea_vel(0) = msg->twist.linear.x;
-  mea_vel(1) = -msg->twist.linear.y;
-  mea_vel(2) = -msg->twist.linear.z;
-  mea_wb(0) = msg->twist.angular.x;
-  mea_wb(1) = -msg->twist.angular.y;
-  mea_wb(2) = -msg->twist.angular.z;
+void SE3Controller::updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w) {
+  mea_vel = v;
+  mea_wb = w;
 }
 
 void SE3Controller::joyCB(const sensor_msgs::Joy::ConstPtr& joy) {
@@ -133,13 +111,4 @@ void SE3Controller::calcSE3(const Eigen::Vector3d &r_euler, const Eigen::Vector3
     motorCmd[i] = ffff(i)/TCOEFF;
   }
 
-  // publish commands
-  mavros_msgs::ActuatorControl cmd;
-  cmd.header.stamp = ros::Time::now();
-  cmd.group_mix = 0;
-  for(int i=0; i<4; i++) {
-    cmd.controls[i] = motorCmd[i];
-  }
-  cmd.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
-  actuatorPub.publish(cmd);
 }

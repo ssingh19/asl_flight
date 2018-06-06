@@ -139,7 +139,7 @@ include_directories(
 
 add_executable(asl_traj_ctrl
   src/asl_traj_ctrl.cpp
-  src/se3controller.cpp)
+  src/control/se3controller.cpp)
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
 

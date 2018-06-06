@@ -12,21 +12,16 @@
 class SE3Controller {
 private:
   ros::NodeHandle nh;
-  ros::Subscriber poseSub;
-  ros::Subscriber velSub;
-  ros::Subscriber joySub;
-  ros::Publisher actuatorPub;
-
   Eigen::Matrix3d mea_R;
   Eigen::Vector3d mea_wb;
   Eigen::Vector3d mea_pos;
   Eigen::Vector3d mea_vel;
+  ros::Subscriber joySub;
 
   Eigen::Matrix4d W;
 
   double fzCmd; // result of SE3 controller computation
   Eigen::Vector3d tauCmd; // result of SE3 controller computation
-  double motorCmd[4];
   double joyCmd[4]; // desired thrust + euler angles from joystick
 
   double KP;
@@ -38,12 +33,14 @@ private:
   double TCOEFF;
   std::string MODEL;
 
-  void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg);
-  void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg);
   void joyCB(const sensor_msgs::JoyConstPtr &joy);
 
 public:
+  double motorCmd[4];
   SE3Controller(void);
+
+  void updatePose(const Eigen::Vector3d &r, const Eigen::Matrix3d &R);
+  void updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w);
   void calcSE3(
           const Eigen::Vector3d &r_euler,
           const Eigen::Vector3d &r_wb,
