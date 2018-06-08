@@ -1,6 +1,7 @@
 #include <iostream>
 #include <control/se3controller.h>
 #include <trajectory/trajectory.h>
+#include <std_msgs/Float64.h>
 #include "mavros_msgs/ActuatorControl.h"
 #include <mavros_msgs/State.h>
 #include <string>
@@ -8,6 +9,8 @@
 #include <ros/console.h>
 
 #define TAKEOFF_TIME 5.0
+
+#define TAKEOFF_HGT 1.0
 
 // Measured states
 std::string current_mode;
@@ -68,6 +71,16 @@ int main(int argc, char **argv)
   ros::Publisher actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
   mavros_msgs::ActuatorControl cmd;
 
+  // DEBUG PUBLICATIONS
+  ros::Publisher debug_pub1 = nh.advertise<std_msgs::Float64>("/debug1", 1);
+  ros::Publisher debug_pub2 = nh.advertise<std_msgs::Float64>("/debug2", 1);
+  ros::Publisher debug_pub3 = nh.advertise<std_msgs::Float64>("/debug3", 1);
+  ros::Publisher debug_pub4 = nh.advertise<std_msgs::Float64>("/debug4", 1);
+  ros::Publisher debug_pub5 = nh.advertise<std_msgs::Float64>("/debug5", 1);
+  ros::Publisher debug_pub6 = nh.advertise<std_msgs::Float64>("/debug6", 1);
+  ros::Publisher debug_pub7 = nh.advertise<std_msgs::Float64>("/debug7", 1);
+  std_msgs::Float64 debug_msg;
+
   // Define controller classes
   SE3Controller se3ctrl;
 
@@ -100,11 +113,14 @@ int main(int argc, char **argv)
   double time_traj = 0.0;
   double dt = 0.0;
 
+  // Reference values
   double yaw_des = 0.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);
   Eigen::Vector3d r_jer(0, 0, 0);
+
+  Eigen::Vector3d takeoff_loc(0, 0, 0);
 
   while(ros::ok()) {
 
@@ -121,11 +137,13 @@ int main(int argc, char **argv)
 
           ROS_INFO("offboard started");
 
-          // set takeoff hover point
-          r_pos << mea_pos(0)+1.0, mea_pos(1), mea_pos(2)-1.0;
+          // set takeoff location
+          takeoff_loc << mea_pos(0), mea_pos(1), mea_pos(2);
+          // initialize ref pos
+          r_pos << mea_pos(0), mea_pos(1), mea_pos(2);
 
           // set start point for trajectory
-          traj->set_start_pos(r_pos);
+          traj->set_start_pos(takeoff_loc + Eigen::Vector3d(0.0,0.0,-TAKEOFF_HGT));
       } else {
           time_traj += dt;
       }
@@ -135,14 +153,17 @@ int main(int argc, char **argv)
       time_traj = 0.0;
     }
 
-    // Once past initial wait time, overwrite reference
-    if (time_traj > TAKEOFF_TIME) {
+    // Once past takeoff time, start trajectory
+    if (time_traj >= TAKEOFF_TIME) {
       ROS_INFO("error: %.2f", (r_pos-mea_pos).norm());
       traj->eval(time_traj-TAKEOFF_TIME, r_pos, r_vel, r_acc, r_jer);
+    } else {
+      // smooth takeoff
+      r_pos << takeoff_loc(0), takeoff_loc(1), takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
     }
     // Update controller internal state
     se3ctrl.updatePose(mea_pos, mea_R);
-    se3ctrl.updateVel(mea_vel, mea_wb);
+    se3ctrl.updateVel(mea_vel, mea_wb, dt);
 
     // compute control effort
     se3ctrl.calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
@@ -155,6 +176,24 @@ int main(int argc, char **argv)
     }
     cmd.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
     actuatorPub.publish(cmd);
+
+    debug_msg.data = r_pos(0);
+    debug_pub1.publish(debug_msg);
+    debug_msg.data = mea_pos(0);
+    debug_pub2.publish(debug_msg);
+
+    debug_msg.data = r_pos(1);
+    debug_pub3.publish(debug_msg);
+    debug_msg.data = mea_pos(1);
+    debug_pub4.publish(debug_msg);
+
+    debug_msg.data = r_pos(2);
+    debug_pub5.publish(debug_msg);
+    debug_msg.data = mea_pos(2);
+    debug_pub6.publish(debug_msg);
+
+    debug_msg.data = dt;
+    debug_pub7.publish(debug_msg);
 
     //se3ctrl.joySE3();
     ros::spinOnce();

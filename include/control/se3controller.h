@@ -16,6 +16,12 @@ private:
   Eigen::Vector3d mea_wb;
   Eigen::Vector3d mea_pos;
   Eigen::Vector3d mea_vel;
+
+  Eigen::Vector3d vel_prev;
+  double lpf;
+  double dt;
+
+
   ros::Subscriber joySub;
 
   Eigen::Matrix4d W;
@@ -23,6 +29,9 @@ private:
 
   double fzCmd; // result of SE3 controller computation
   Eigen::Vector3d tauCmd; // result of SE3 controller computation
+
+  double fzCmd_prev;
+
   double joyCmd[4]; // desired thrust + euler angles from joystick
 
   double KP;
@@ -41,7 +50,7 @@ public:
   SE3Controller(void);
 
   void updatePose(const Eigen::Vector3d &r, const Eigen::Matrix3d &R);
-  void updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w);
+  void updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w, const double &_dt);
   void calcSE3(
           const double &yaw_des,
           const Eigen::Vector3d &r_pos,

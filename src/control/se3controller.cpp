@@ -6,7 +6,7 @@
 SE3Controller::SE3Controller(void):
     MODEL("aslquad"), KP(4.0), KV(6.0), KR(0.3), KW(0.05),
     M(1.04), g(9.8), TCOEFF(4.4), mea_pos(0,0,0), mea_vel(0,0,0),
-    mea_wb(0,0,0) {
+    mea_wb(0,0,0), dt(1.0), lpf(1.0), fzCmd_prev(0.0) {
   // handle ros parameters
   ros::param::get("~KP", KP);
   ros::param::get("~KV", KV);
@@ -59,8 +59,11 @@ void SE3Controller::updatePose(const Eigen::Vector3d &r, const Eigen::Matrix3d &
   mea_R = R;
 }
 
-void SE3Controller::updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w) {
+void SE3Controller::updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w, const double &_dt) {
+  vel_prev = mea_vel;
   mea_vel = v;
+  dt = _dt;
+
   mea_wb = w;
 }
 
@@ -104,8 +107,13 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
   // Compute desired body Rate
   Eigen::Vector3d acc = g*e3 - (fzCmd/M)*mea_R.col(2);
-  Eigen::Vector3d zb_dot = -KP*(r_vel-mea_vel) - KV*(r_acc-acc) - M*r_jer;
-  Eigen::Vector3d zb_des_dot = (1.0/fzCmd)*zb_dot - (zb_des.dot(zb_dot)/fzCmd)*zb_des;
+  fzCmd_prev = fzCmd;
+
+  if (dt >= 0.001){
+    acc = lpf*acc + (1.0-lpf)*(mea_vel - vel_prev)/dt;
+  }
+  Eigen::Vector3d Fdes_dot = -KP*(mea_vel-r_vel) - KV*(acc-r_acc) + M*r_jer;
+  Eigen::Vector3d zb_des_dot = (zb_des.dot(Fdes_dot)/fzCmd)*zb_des - (1.0/fzCmd)*Fdes_dot;
   Eigen::Vector3d om_skew_des = R_des.transpose()*zb_des_dot;
   double om_z_des = (om_skew_des(0)/R_des(1,1))*R_des(1,2);
   Eigen::Vector3d r_wb(-om_skew_des(1),om_skew_des(0),om_z_des);
@@ -116,8 +124,8 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
   eR = 0.5*eR;
 
   Eigen::Vector3d ew = mea_wb-mea_R.transpose()*R_des*r_wb;
-  eR(2) /= 3.0; // Note: reduce gain on yaw
-  ew(2) /= 3.0;
+  eR(2) /= 1.0; // Note: reduce gain on yaw
+  ew(2) /= 1.0;
   tauCmd = -KR*eR - KW*ew + mea_wb.cross(J*mea_wb) - J*mea_wb.cross(mea_R.transpose()*R_des*r_wb);
 
   //std::cout << "fzCmd = " << fzCmd << std::endl;
