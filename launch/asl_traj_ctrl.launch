@@ -27,7 +27,7 @@
       <param name="KR" value="3.5" />
       <param name="KW" value="0.2" />
       <param name="M" value="1.5" />
-      <param name="TRAJ" type="str" value="CIRCLE" />
+      <param name="TRAJ" type="str" value="HOVER" />
       <param name="TCOEFF" value="6.57" />
       <param name="MODEL" value="iris"/>
     </node>

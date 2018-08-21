@@ -42,7 +42,7 @@ SE3Controller::SE3Controller(void):
   mea_R = Eigen::Matrix3d::Identity();
 
 
-  std::cout << "Using the following parameters: " << std::endl;
+  std::cout << "SE3 Using the following parameters: " << std::endl;
   std::cout << "KP = " << KP << std::endl;
   std::cout << "KV = " << KV << std::endl;
   std::cout << "KR = " << KR << std::endl;
