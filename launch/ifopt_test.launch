@@ -1,0 +1,11 @@
+<launch>
+
+    <param name="use_sim_clock" type="bool" value="true" />
+
+
+    <node pkg="asl_flight" type="ifopt_test" name="ifopt_test" output="screen" >
+    </node>
+
+    <!-- param name="use_sim_clock" type="bool" value="true" -->
+
+</launch>

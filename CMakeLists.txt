@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   mavros
   mavros_msgs
+  ifopt
 )
 
 ## System dependencies are found with CMake's conventions
@@ -138,14 +139,23 @@ include_directories(
 ## add_executable(actuator_test src/actuator_test/actuator_test.cpp)
 ## target_link_libraries(actuator_test ${catkin_LIBRARIES})
 
+add_compile_options(-std=c++11)
+
 add_executable(asl_traj_ctrl
   src/asl_traj_ctrl.cpp
   src/control/se3controller.cpp
   src/control/ccmcontroller.cpp
+  src/GeoProb/Geodesic.cpp
   src/trajectory/circle_trajectory.cpp
   src/trajectory/hover_trajectory.cpp)
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
+
+add_executable(Test_GeoProb
+  src/Test_GeoProb.cpp
+  src/GeoProb/Geodesic.cpp)
+target_link_libraries(Test_GeoProb ${catkin_LIBRARIES})
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

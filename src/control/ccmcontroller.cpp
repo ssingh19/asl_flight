@@ -1,25 +1,28 @@
 #include <control/ccmcontroller.h>
 #include <Eigen/Dense>
 #include <math.h>
+#include <GeoProb/Metric.h>
 
 
 /********* Constructor ***********/
 CCMController::CCMController(void):
-    MODEL("aslquad"),  M(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(0.1),
+    active(false),
     mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), dt(1.0),
-    fz(0.0),fz_dot(0.0), fzCmd(0.0), fzCmd_prev(0.0), active(false),
-    uc_fb(0.0,0.0,0.0,0.0), euler_dot(0.0,0.0,0.0), r_wb(0.0,0.0,0.0),tauCmd(0.0,0.0,0.0),
-    _xc_nom(10), _uc_nom(0.0,0.0,0.0,0.0), _xic_nom(10), _xc(10), _xic(10), _xc_nom_dot(10), _xc_dot(10) {
+    _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
+    E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
+    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),
+    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(0.998){
 
   // handle ros parameters
+  ros::param::get("~KR", KR);
   ros::param::get("~KW", KW);
-  ros::param::get("~M", M);
+  ros::param::get("~M", mass);
   ros::param::get("~TCOEFF", TCOEFF);
   ros::param::get("~MODEL", MODEL);
 
-  // W and J
+  // A and J
   if(MODEL=="aslquad") {
-    W << 1, 1, 1, 1,
+    A << 1, 1, 1, 1,
         -0.12, 0.12, 0.12, -0.12,
         -0.12, 0.12, -0.12, 0.12,
         -0.06, -0.06, 0.06, 0.06;
@@ -28,7 +31,7 @@ CCMController::CCMController(void):
 
   } else if(MODEL=="iris") {
     // Iris in Gazebo (ENU torque command)
-    W << 1, 1, 1, 1,
+    A << 1, 1, 1, 1,
         -0.22, 0.2, 0.22, -0.2,
         -0.13, 0.13, -0.13, 0.13,
         -0.06, -0.06, 0.06, 0.06;
@@ -43,62 +46,67 @@ CCMController::CCMController(void):
 
   // Measured quantity
   mea_R = Eigen::Matrix3d::Identity();
+  _R_des = Eigen::Matrix3d::Identity();
 
   // CCM variables
-  _xc_nom.setZero();
-  _xic_nom.setZero();
-  _xc.setZero();
-  _xic.setZero();
+  _xc_nom.setZero(); _xc_nom(6) = g;
+  _xc.setZero(); _xc(6) = g;
   _xc_nom_dot.setZero();
   _xc_dot.setZero();
-  _xc_nom(6) = 0.0;
-  _xc_nom(9) = 0.0;
+  _W_nom = Eigen::MatrixXd::Identity(9,9);
+  _W = _W_nom;
+  _M_nom = Eigen::MatrixXd::Identity(10,10);
+  _M = _M_nom;
 
-  _M_nom = Eigen::MatrixXd::Identity(9,9);
-  _M = Eigen::MatrixXd::Identity(9,9);
-
-  // double d_bar = 0.0283;
-  double d_bar = 0.215;
-  double yaw_bound = 5.0*M_PI/180.0;
-  double _M_yaw = std::pow((d_bar/yaw_bound),2.0);
+  double d_bar = 0.0420;
+  double yaw_bound = 45.0*PI/180.0;
+  _M_yaw = std::pow((d_bar/yaw_bound),2.0);
+  _M_nom(9,9) = _M_yaw;
+  _M(9,9) = _M_yaw;
 
   _B_ctrl = Eigen::MatrixXd(10,4);
   _B_ctrl << Eigen::MatrixXd::Zero(6,4),
              Eigen::MatrixXd::Identity(4,4);
 
-  ROS_INFO("ccm init here");
+  // Initialize geo_Prob
+  // int N = 3;
+  // geo_Prob = new ifopt::Problem;
+  // ipopt = new ifopt::IpoptSolver;
+  // geovar_ptr = std::make_shared<ifopt::GeoVariables>(N);
+  // geocon_ptr = std::make_shared<ifopt::GeoConstraint>(N);
+  // geo_Prob->AddVariableSet  (geovar_ptr);
+  // geo_Prob->AddConstraintSet(geocon_ptr);
+  // geo_Prob->AddCostSet      (std::make_shared<ifopt::GeoCost>(N));
+  // geo_Prob->PrintCurrent();
+  // ipopt->SetOption("linear_solver", "mumps");
+  // ipopt->SetOption("jacobian_approximation", "exact");
+  // ipopt->SetOption("tol",0.000000001);
+  // ipopt->SetOption("print_level",0);
+  // ipopt->SetOption("sb","yes");
+  // c_opt = Eigen::VectorXd::Constant((N+1)*9,0.0);
 
-  _M_xi = Eigen::MatrixXd(10,10);
 
-  // _M_xi <<
- //  0.1071,    0.0000,    0.0000,    0.0755,   -0.0000,   -0.0000,    0.0144,   -0.0000,   -0.0000,         0.0,
- //  0.0000,    0.1071,    0.0000,    0.0000,    0.0755,   -0.0000,    0.0000,    0.0144,   -0.0000,         0.0,
- //  0.0000,    0.0000,    0.1071,    0.0000,    0.0000,    0.0755,    0.0000,    0.0000,    0.0144,         0.0,
- //  0.0755,    0.0000,    0.0000,    0.0796,   -0.0000,   -0.0000,    0.0165,   -0.0000,   -0.0000,         0.0,
- // -0.0000,    0.0755,    0.0000,   -0.0000,    0.0796,   -0.0000,   -0.0000,    0.0165,   -0.0000,         0.0,
- // -0.0000,   -0.0000,    0.0755,   -0.0000,   -0.0000,    0.0796,   -0.0000,   -0.0000,    0.0165,         0.0,
- //  0.0144,    0.0000,    0.0000,    0.0165,   -0.0000,   -0.0000,    0.0082,   -0.0000,   -0.0000,         0.0,
- // -0.0000,    0.0144,    0.0000,   -0.0000,    0.0165,   -0.0000,   -0.0000,    0.0082,   -0.0000,         0.0,
- // -0.0000,   -0.0000,    0.0144,   -0.0000,   -0.0000 ,   0.0165,   -0.0000,   -0.0000,    0.0082,         0.0,
- //  Eigen::MatrixXd::Zero(1,9), _M_yaw;
+  // Initialize geo solution struct
+  // X_dot_Geod = Eigen::MatrixXd(9,2);
+  X_dot_EndP = Eigen::MatrixXd(10,2);
+  // Eigen::MatrixXd T_dot_EndP(N+1,2);
+  // Eigen::Vector2d t(-1.0,1.0);
+  // geodesic::compute_cheby_d(T_dot_EndP,N,1,t);
+  // Jacobian basis(9,9*(N+1));
+  // basis.reserve(Eigen::VectorXi::Constant(9,N+1));
+  // Phi_dot = std::vector<Jacobian> (2,basis);
+  // for (int k=0; k<2; k++){
+  //   for (int i=0; i<9; i++){
+  //     for (int j=0; j<N+1; j++){
+  //       Phi_dot[k].insert(i,i*(N+1)+j) = 2.0*T_dot_EndP(j,k);
+  //     }
+  //   }
+  // }
 
-  _M_xi <<
- 0.0232,   -0.0000,   -0.0000,    0.0069,   -0.0000,   -0.0000,    0.0116,   -0.0000,   -0.0000,         0,
--0.0000,    0.0232,   -0.0000,    0.0000,    0.0069,   -0.0000,   -0.0000,    0.0116,   -0.0000,         0,
--0.0000,   -0.0000,    0.0232,    0.0000,    0.0000,    0.0069,   -0.0000,   -0.0000,    0.0116,         0,
- 0.0069,    0.0000,    0.0000,    0.0462,    0.0000,    0.0000,    0.0057,   -0.0000,   -0.0000,         0,
--0.0000,    0.0069,    0.0000,    0.0000,    0.0462,    0.0000,    0.0000,    0.0057,   -0.0000,         0,
--0.0000,   -0.0000,    0.0069,    0.0000,    0.0000,    0.0462,    0.0000,    0.0000,    0.0057,         0,
- 0.0116,   -0.0000,   -0.0000,    0.0057,    0.0000,    0.0000,    0.0284,    0.0000,    0.0000,         0,
--0.0000,    0.0116,   -0.0000,   -0.0000,    0.0057,    0.0000,    0.0000,    0.0284,    0.0000,         0,
--0.0000,   -0.0000,    0.0116,   -0.0000,   -0.0000,    0.0057,    0.0000,    0.0000,    0.0284,         0,
-Eigen::MatrixXd::Zero(1,9), _M_yaw;
-
-  ROS_INFO("ccm init here");
-
+  // Readout
   std::cout << "CCM Using the following parameters: " << std::endl;
   std::cout << "KW = " << KW << std::endl;
-  std::cout << "M = " << M << std::endl;
+  std::cout << "M = " << mass << std::endl;
   std::cout << "TCOEFF = " << TCOEFF << std::endl;
   std::cout << "MODEL: " << MODEL << std::endl;
 
@@ -107,73 +115,21 @@ Eigen::MatrixXd::Zero(1,9), _M_yaw;
 /********* State update ***********/
 void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d &R,
                                 const Eigen::Vector3d &v, const Eigen::Vector3d &w,
-                                const double _dt, const int pos_type, const int vel_type) {
+                                const double _dt, const int pose_up, const int vel_up) {
 
   dt = _dt;
-  mea_pos = r;
-  mea_vel = v;
+  if (pose_up == 0 && active) {
+    mea_pos += 0.5*(v+mea_vel)*dt;
+  } else { mea_pos = r;}
+  if (vel_up == 0 && active) {
+    Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
+    accel(2) += g;
+    mea_vel += accel*dt;
+  } else {mea_vel = v;}
+
   mea_R = R;
   mea_wb = w;
-  R2euler_321();
-
-
-  // POSE
-  // if (pos_type == 0){
-  //   // need to integrate
-  //   Eigen::Vector3d int_vel = mea_vel;
-  //   Eigen::Vector3d int_om = r_wb;
-  //   if (vel_type == 1) {
-  //     // use midpoint integration
-  //     int_vel = 0.5*(mea_vel+v);
-  //     //int_om = 0.5*(mea_wb+w);
-  //   }
-  //   mea_pos += int_vel*dt;
-  //
-  //   // Eigen::Matrix3d R_up = R_rot(int_om.norm()*dt,int_om.normalized());
-  //   // mea_R = mea_R*R_up;
-  //   mea_R = R;
-  //
-  // } else {
-  //   // copy over
-  //   mea_pos = r;
-  //   mea_R = R;
-  // }
-  // R2euler_123();
-  //
-  // // Velocity
-  // if (vel_type == 0){
-  //   // need to integrate
-  //   if (active && mea_pos(2)<=-0.2){ //only update if active & off the ground
-  //     Eigen::Vector3d accel(0.0,0.0,g);
-  //     accel -= fzCmd*mea_R.col(2);
-  //     mea_vel += accel*dt;
-  //   } else { mea_vel = v; }
-  //   mea_wb = w;
-  // } else {
-  //   // type 2 - copy over
-  //   mea_vel = v;
-  //   mea_wb = w;
-  // }
-
-}
-
-Eigen::Matrix3d CCMController::R_rot(const double a, const Eigen::Vector3d n){
-  double c = std::cos(a/2.0);
-  double s = std::sin(a/2.0);
-  double q1 = c;
-  double q2 = s*n(0);
-  double q3 = s*n(1);
-  double q4 = s*n(2);
-  double q1s = q1*q1;
-  double q2s = q2*q2;
-  double q3s = q3*q3;
-  double q4s = q4*q4;
-
-  Eigen::Matrix3d R;
-  R <<
-    q1s+q2s-q3s-q4s, 2.0*(q2*q3-q1*q4) ,2.0*(q2*q4+q1*q3),
-    2.0*(q2*q3+q1*q4), q1s-q2s+q3s-q4s, 2.0*(q3*q4-q1*q2),
-    2.0*(q2*q4-q1*q3), 2.0*(q3*q4+q1*q2), q1s-q2s-q3s+q4s;
+  R2euler_123();
 }
 
 void CCMController::R2euler_123(void){
@@ -182,14 +138,10 @@ void CCMController::R2euler_123(void){
   euler(2) = std::atan2(-mea_R(0,1),mea_R(0,0));
 }
 
-void CCMController::R2euler_321(void){
-  euler(0) = std::atan2(mea_R(2,1),mea_R(2,2));
-  euler(1) = std::atan2(-mea_R(2,0),mea_R(2,1)*std::sin(euler(0))+mea_R(2,2)*std::cos(euler(0)));
-  euler(2) = std::atan2(mea_R(1,0),mea_R(0,0));
-}
-
-void CCMController::setfz(double _fz){
-  fz = _fz;
+void CCMController::Euler2R_123(const double r, const double p, const double y){
+  _R_des <<  cos(p)*cos(y),-cos(p)*sin(y), sin(p),
+             cos(r)*sin(y)+cos(y)*sin(p)*sin(r), cos(r)*cos(y)-sin(p)*sin(r)*sin(y), -cos(p)*sin(r),
+             sin(r)*sin(y)-cos(r)*cos(y)*sin(p), cos(y)*sin(r)+cos(r)*sin(p)*sin(y),  cos(p)*cos(r);
 }
 
 /********* CCM fncs ***********/
@@ -205,63 +157,39 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
   Eigen::Vector3d th_vec(r_acc(0), r_acc(1), r_acc(2)-g);
   _xc_nom(6) = th_vec.norm();
 
-  Eigen::Vector3d zb_des = -th_vec.normalized();
-  Eigen::Vector3d yc_des(-std::sin(yaw_des), std::cos(yaw_des), 0.0);
-  Eigen::Vector3d xb = yc_des.cross(zb_des);
-  Eigen::Vector3d xb_des = xb.normalized();
-  Eigen::Vector3d yb_des = zb_des.cross(xb_des);
-
-  _xc_nom(7) = std::atan2(yb_des(2),zb_des(2));
-  _xc_nom(8) = std::atan2(-xb_des(2),yb_des(2)*std::sin(euler(0))+zb_des(2)*std::cos(euler(0)));
+  _xc_nom(7) = std::atan2(r_acc(1),g-r_acc(2));
+  _xc_nom(8) = std::asin(-r_acc(0)/_xc_nom(6));
   _xc_nom(9) = yaw_des;
 
-  // _xc_nom(7) = std::atan2(r_acc(1),g-r_acc(2));
-  // _xc_nom(8) = std::asin(-r_acc(0)/_xc_nom(6));
-  // _xc_nom(9) = yaw_des;
+  _uc_nom(0) = th_vec.normalized().dot(r_jer);
 
-  _uc_nom(0) = -zb_des.dot(r_jer);
+  Euler2R_123(_xc_nom(7),_xc_nom(8),_xc_nom(9));
 
   double om_1 = 0.0;
   double om_2 = 0.0;
   if (_xc_nom(6)>0.0) {
-    om_1 = r_jer.dot(yb_des)*(1.0/_xc_nom(6));
-    om_2 = -r_jer.dot(xb_des)*(1.0/_xc_nom(6));
+    om_1 = r_jer.dot(_R_des.col(1))*(1.0/_xc_nom(6));
+    om_2 = -r_jer.dot(_R_des.col(0))*(1.0/_xc_nom(6));
   }
 
-  _uc_nom(1) = om_1;
-  _uc_nom(2) = om_2;
-  // _uc_nom(1) = om_2*(std::cos(yaw_des)/std::cos(_xc(8))) +
-  //              om_1*(std::sin(yaw_des)/std::cos(_xc(8)));
-  // _uc_nom(2) = std::sin(yaw_des)*om_skew(1) - std::cos(yaw_des)*om_skew(0);
+  _uc_nom(1) = om_1*(cos(yaw_des)/cos(_xc_nom(8)))-
+               om_2*(sin(yaw_des)/cos(_xc_nom(8)));
+  _uc_nom(2) = sin(yaw_des)*om_1 + cos(yaw_des)*om_2;
   _uc_nom(3) = 0.0;
 
+  double om_3 = sin(_xc_nom(7))*_uc_nom(1)+_uc_nom(3);
+  r_w_nom << om_1, om_2, om_3;
+
 }
 
-void CCMController::Phi(const Eigen::VectorXd &xc, Eigen::VectorXd &xic){
+void CCMController::calc_CCM_dyn(const Eigen::VectorXd &xc,const Eigen::Vector4d &uc,
+                                  Eigen::VectorXd &dyn){
 
-  Eigen::Vector3d b_T(sin(xc(8)), -cos(xc(8))*sin(xc(7)), cos(xc(8))*cos(xc(7)));
-  xic << xc(0), xc(1), xc(2), xc(3), xc(4), xc(5), -xc(6)*b_T(0), -xc(6)*b_T(1), g-xc(6)*b_T(2), xc(9);
-}
+  double r = xc(7);
+  double p = xc(8);
+  double y = xc(9);
 
-void CCMController::M_fnc(const Eigen::VectorXd &xc, Eigen::MatrixXd &M){
-
-  Eigen::Vector3d b_T(sin(xc(8)), -cos(xc(8))*sin(xc(7)), cos(xc(8))*cos(xc(7)));
-  Eigen::MatrixXd db_T_q(3,2);
-  db_T_q <<  0.0, cos(xc(8)),
-            -cos(xc(7))*cos(xc(8)), sin(xc(7))*sin(xc(8)),
-            -sin(xc(7))*cos(xc(8)), -cos(xc(7))*sin(xc(8));
-
-  Eigen::MatrixXd Phi_jac(10,10);
-  Phi_jac << Eigen::MatrixXd::Identity(6,6), Eigen::MatrixXd::Zero(6,4),
-             Eigen::MatrixXd::Zero(3,6), -b_T, -db_T_q*xc(6), Eigen::MatrixXd::Zero(3,1),
-             Eigen::MatrixXd::Zero(1,9), 1;
-
-  M = _M_xi*Phi_jac;
-}
-
-void CCMController::dynamics(const Eigen::VectorXd &xc, const Eigen::Vector4d &uc, Eigen::VectorXd &dyn){
-
-  Eigen::Vector3d b_T(sin(xc(8)), -cos(xc(8))*sin(xc(7)), cos(xc(8))*cos(xc(7)));
+  Eigen::Vector3d b_T(sin(p), -cos(p)*sin(r), cos(p)*cos(r));
 
   Eigen::VectorXd f(10);
   f << xc(3), xc(4), xc(5), -xc(6)*b_T(0), -xc(6)*b_T(1), g-xc(6)*b_T(2), 0,0,0,0;
@@ -293,17 +221,15 @@ Eigen::Vector3d CCMController::getEulerdot(){
   return euler_dot;
 }
 
-Eigen::Vector3d CCMController::getvel(){
-  return mea_vel;
+Eigen::Vector3d CCMController::getEuler(){
+  return euler;
 }
 
 void CCMController::setMode(const bool _m){
   active = _m;
   if (active==false){
     // reset
-    fz = 0.0;
-    fzCmd = 0.0;
-    fzCmd_prev = 0.0;
+    fzCmd = g;
     fz_dot = 0.0;
     uc_fb.setZero();
     euler_dot.setZero();
@@ -316,39 +242,51 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
           const Eigen::Vector3d &r_acc, const Eigen::Vector3d &r_jer) {
 
 
-  // Record previous thrust
-  fzCmd_prev = fzCmd;
-  fz = fzCmd_prev;
-
   if (active){
     // Compute nominal xc and uc
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fzCmd_prev, euler;
+    _xc << mea_pos, mea_vel, fzCmd, euler;
 
-    // compute xic
-    Phi(_xc_nom,_xic_nom);
-    Phi(_xc,_xic);
+    // Update Geodesic prob
+    // geovar_ptr->UpdateInit(_xc_nom,_xc);
+    // geocon_ptr->update_bounds(_xc_nom,_xc);
 
-    // compute M
-    M_fnc(_xc_nom,_M_nom);
-    M_fnc(_xc, _M);
+    // Solve Geodesic prob
+    // ipopt->Solve(*geo_Prob);
+    // c_opt = geo_Prob->GetOptVariables()->GetValues();
+    // c_opt = geo_Prob->GetVariableValues();
+    // X_dot_Geod.col(0) = Phi_dot[0]*c_opt;
+    // X_dot_Geod.col(1) = Phi_dot[1]*c_opt;
 
-    // compute dynamics
-    dynamics(_xc_nom,_uc_nom,_xc_nom_dot);
-    dynamics(_xc, _uc_nom, _xc_dot);
+    // Augment solution with yaw
+    // X_dot_EndP.col(0) << X_dot_Geod.col(0), euler(2)-yaw_des;
+    // X_dot_EndP.col(1) << X_dot_Geod.col(1), euler(2)-yaw_des;
+    X_dot_EndP.col(0) = _xc - _xc_nom;
+    X_dot_EndP.col(1) = _xc - _xc_nom;
+
+    // Compute auxiliaries
+    geodesic::compute_W(_xc_nom, _W_nom);
+    geodesic::compute_W(_xc, _W);
+    _M_nom.block(0,0,9,9) = _W_nom.inverse();
+    _M.block(0,0,9,9) = _W.inverse();
+    calc_CCM_dyn(_xc_nom, _uc_nom, _xc_nom_dot);
+    calc_CCM_dyn(_xc, _uc_nom, _xc_dot);
 
     // Now do the computation
-    Eigen::VectorXd d_xic = _xic-_xic_nom;
-    E = d_xic.dot(_M_xi*d_xic);
+    E = 0.5*( X_dot_EndP.col(0).dot(_M_nom*X_dot_EndP.col(0))+
+              X_dot_EndP.col(1).dot(_M*X_dot_EndP.col(1)) );
 
-    double a = 2.0*lambda*E - 2.0*d_xic.dot(_M_nom*_xc_nom_dot) + 2.0*d_xic.dot(_M*_xc_dot);
-    Eigen::MatrixXd b = (2.0*d_xic.transpose()*_M*_B_ctrl).transpose();
+    double a = 2.0*lambda*E - 2.0*X_dot_EndP.col(0).dot(_M_nom*_xc_nom_dot)+
+                              2.0*X_dot_EndP.col(1).dot(_M*_xc_dot);
+    Eigen::Vector4d b = (2.0*X_dot_EndP.col(1).transpose()*_M*_B_ctrl).transpose();
 
     uc_fb.setZero();
-    if (b.norm()>1e-6  && a > 0) {
-      uc_fb = -(a/b.squaredNorm()) * b;
+    if (b.norm()>1e-5) {
+      if (a > 0){
+        uc_fb = -(a/b.squaredNorm()) * b;
+      }
     }
 
     // Debug controller comp
@@ -363,22 +301,15 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
               _xc(3),_xc(4),_xc(5),
               _xc(6),_xc(7),_xc(8),
               _xc(9));
-    ROS_INFO("xc_dot:%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
-              _xc_dot(0),_xc_dot(1),_xc_dot(2),
-              _xc_dot(3),_xc_dot(4),_xc_dot(5),
-              _xc_dot(6),_xc_dot(7),_xc_dot(8),
-              _xc_dot(9));
-    ROS_INFO("E:%.3f, a:%.3f, b:(%.3f,%.3f,%.3f,%.3f)",E,a,b(0),b(1),b(2),b(3));
+    ROS_INFO("E:%.3f, uc_fb:(%.3f,%.3f,%.3f,%.3f)",E,uc_fb(0),uc_fb(1),uc_fb(2),uc_fb(3));
+    ROS_INFO("E:%.3f, uc:(%.3f,%.3f,%.3f,%.3f)",E,uc_fb(0)+_uc_nom(0),uc_fb(1)+_uc_nom(1),uc_fb(2)+_uc_nom(2),uc_fb(3)+_uc_nom(3));
     */
-
-    // Debug CCM output
-    //ROS_INFO("E:%.3f, uc_fb:(%.3f,%.3f,%.3f,%.3f)",E,uc_fb(0),uc_fb(1),uc_fb(2),uc_fb(3));
 
     // Update fz_dot
     fz_dot = _uc_nom(0)+uc_fb(0);
 
     // Update thrust
-    fzCmd = fzCmd_prev + fz_dot*dt;
+    fzCmd = fzCmd + fz_dot*dt;
 
     // Update desired euler_dot_rate
     euler_dot << _uc_nom(1)+uc_fb(1),_uc_nom(2)+uc_fb(2),_uc_nom(3)+uc_fb(3);
@@ -387,17 +318,56 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     uc_fb.setZero();
     euler_dot.setZero();
     fz_dot = 0.0;
-    fzCmd = 0.0;
+    fzCmd = g;
   }
 
   // Convert to desired omega
   R_om(euler,euler_dot);
 
   Eigen::Vector3d ew = mea_wb-r_wb;
-  tauCmd = -KW*ew + mea_wb.cross(J*mea_wb)- J*mea_wb.cross(r_wb);
+  tauCmd = -KW*ew + mea_wb.cross(J*mea_wb) -J*mea_wb.cross(r_wb);
 
-  Eigen::Vector4d wrench(fzCmd*M, tauCmd(0), -tauCmd(1), -tauCmd(2));
-  Eigen::Vector4d ffff = W.colPivHouseholderQr().solve(wrench);
+  Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
+  Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);
+
+  // Find worst violator
+  bool sat = false;
+  double worst_viol = 0.0;
+  int worst_f = 0;
+  double f_min = 0.1*mass*g/4.0;
+  for (int i = 0; i<4; i++){
+    if (ffff(i) < f_min || ffff(i) > TCOEFF) {
+      sat = true;
+      double low_pen = std::abs(std::min(ffff(i)-f_min,0.0));
+      double high_pen = std::abs(std::max(ffff(i)-TCOEFF,0.0));
+      if ( low_pen > worst_viol || high_pen > worst_viol ) {
+        worst_viol = std::max(low_pen,high_pen);
+        worst_f = i;
+      }
+    }
+  }
+  // Tune down tau_z, while maintaining thrust and tau_xy
+  if (sat){
+    ffff(worst_f) = ffff(worst_f) < f_min ? f_min : TCOEFF;
+    Eigen::Matrix4d A_up = A;
+    int i_up = 0;
+    for (int i=0; i<4; i++){
+      if (i!=worst_f){
+        A_up.col(i_up) = A.col(i);
+        i_up += 1;
+      }
+    }
+    A_up.col(3) = Eigen::Vector4d(0.0,0.0,0.0,1.0);
+    wrench(3) = 0.0;
+    Eigen::Vector4d ffff_up = A_up.colPivHouseholderQr().solve(wrench-ffff(worst_f)*A.col(worst_f));
+    i_up = 0;
+    for (int i=0; i<4; i++){
+      if (i!=worst_f){
+        ffff(i) = ffff_up(i_up);
+        i_up += 1;
+      }
+    }
+  }
 
   // std::cout << fzCmd << std::endl;
 

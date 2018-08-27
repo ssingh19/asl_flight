@@ -21,10 +21,18 @@ void CircleTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel
 
 	// Horizontal Circle
 
-	pos << radius*sin(om*t)+start_pos(0), radius-radius*cos(om*t)+start_pos(1), start_pos(2);
-	vel << om*radius*cos(om*t), om*radius*sin(om*t), 0.0;
-	acc << -om*om*radius*sin(om*t), om*om*radius*cos(om*t), 0.0;
-	jer << -om*om*om*radius*cos(om*t), -om*om*om*radius*sin(om*t), 0.0;
+	if (t <= 2.0) {
+		pos = start_pos;
+		vel.setZero();
+		acc.setZero();
+		jer.setZero();
+	} else {
+		t = t-2.0;
+		pos << radius*sin(om*t)+start_pos(0), radius-radius*cos(om*t)+start_pos(1), start_pos(2);
+		vel << om*radius*cos(om*t), om*radius*sin(om*t), 0.0;
+		acc << -om*om*radius*sin(om*t), om*om*radius*cos(om*t), 0.0;
+		jer << -om*om*om*radius*cos(om*t), -om*om*om*radius*sin(om*t), 0.0;
+	}
 
 }
 

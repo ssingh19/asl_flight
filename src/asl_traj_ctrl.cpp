@@ -10,6 +10,12 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 
+#include <ifopt/problem.h>
+#include <ifopt/ipopt_solver.h>
+#include <GeoProb/GeoProb.h>
+#include <GeoProb/Geodesic.h>
+#include <GeoProb/Metric.h>
+
 #define TAKEOFF_TIME 5.0
 
 #define TAKEOFF_HGT 1.0
@@ -136,7 +142,7 @@ int main(int argc, char **argv)
 
 
   // Controller frequency
-  ros::Rate rate(300.0);
+  ros::Rate rate(250.0);
 
   // Tracking status variables
   bool traj_started = false;
@@ -154,16 +160,16 @@ int main(int argc, char **argv)
 
   // CCM values
   fz_est = 0.0;
-  double fz_cmd = 0.0;
+  double fz_cmd = 9.8066;
+  Eigen::Vector3d euler;
   Eigen::Vector3d euler_dot;
   vel_prev_t = 0.0;
-
 
   while(ros::ok()) {
     // Check for state update
     ros::spinOnce();
 
-    ROS_INFO("pose_up:%d, vel_up:%d", pose_up, vel_up);
+    //ROS_INFO("pose_up:%d, vel_up:%d", pose_up, vel_up);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;
@@ -186,7 +192,7 @@ int main(int argc, char **argv)
 
           // set takeoff location
           takeoff_loc << mea_pos(0), mea_pos(1), mea_pos(2);
-          
+
           // initialize ref pos and ref vel
           r_pos = takeoff_loc;
           r_vel << 0.0, 0.0, -(TAKEOFF_HGT/TAKEOFF_TIME);
@@ -201,18 +207,19 @@ int main(int argc, char **argv)
       traj_started = false;
       time_traj = 0.0;
       ccmctrl.setMode(traj_started);
+      r_vel.setZero(); r_acc.setZero(); r_jer.setZero();
     }
 
     // Compute nominal
     if (time_traj >= TAKEOFF_TIME) {
       // Once past takeoff time, start trajectory
-      ROS_INFO("error: %.2f", (r_pos-mea_pos).norm());
+      ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
       traj->eval(time_traj-TAKEOFF_TIME, r_pos, r_vel, r_acc, r_jer);
     } else {
       // smooth takeoff
       r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
-      // r_vel(2) = (TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0))*(time_traj-TAKEOFF_TIME);
-      // r_acc << 0.0, 0.0,(TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0));
+      //r_vel(2) = (TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0))*(time_traj-TAKEOFF_TIME);
+      //r_acc << 0.0, 0.0,(TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0));
     }
     // Update controller internal state
     ccmctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, dt, pose_up, vel_up);
@@ -233,25 +240,28 @@ int main(int argc, char **argv)
     cmd.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
     actuatorPub.publish(cmd);
 
+    // Publish
+    euler_dot = ccmctrl.getEulerdot();
+    euler = ccmctrl.getEuler();
+
     debug_msg.data = r_pos(0);
     debug_pub1.publish(debug_msg);
-    debug_msg.data = r_pos(1);
-    debug_pub2.publish(debug_msg);
-    debug_msg.data = r_pos(2);
-    debug_pub3.publish(debug_msg);
-
     debug_msg.data = mea_pos(0);
-    debug_pub4.publish(debug_msg);
+    debug_pub2.publish(debug_msg);
+
+    debug_msg.data = r_pos(1);
+    debug_pub3.publish(debug_msg);
     debug_msg.data = mea_pos(1);
+    debug_pub4.publish(debug_msg);
+
+    debug_msg.data = r_pos(2);
     debug_pub5.publish(debug_msg);
     debug_msg.data = mea_pos(2);
     debug_pub6.publish(debug_msg);
 
-
     debug_msg.data = ccmctrl.getE();
     debug_pub7.publish(debug_msg);
 
-    euler_dot = ccmctrl.getEulerdot();
     debug_msg.data = euler_dot(0);
     debug_pub8.publish(debug_msg);
     debug_msg.data = euler_dot(1);
@@ -263,14 +273,6 @@ int main(int argc, char **argv)
     debug_pub11.publish(debug_msg);
     debug_msg.data = fz_est;
     debug_pub12.publish(debug_msg);
-
-
-
-    // Adjust for threst estimation
-    // if (vel_up == 0){
-    //   mea_vel = ccmctrl.getvel();
-    //   vel_prev_t += dt;
-    // }
 
     // Reset update
     pose_up = 0; vel_up = 0;

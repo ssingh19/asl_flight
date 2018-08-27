@@ -61,6 +61,7 @@
   <exec_depend>mavros</exec_depend>
   <exec_depend>mavros_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <depend>ifopt</depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
