@@ -29,6 +29,7 @@ Eigen::Vector3d mea_vel;
 Eigen::Vector3d vel_prev;
 double vel_prev_t;
 double fz_est;
+double fz_cmd;
 
 // Update variables
 int pose_up;
@@ -82,7 +83,9 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   //update accel estimate
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
   acc(2) += -9.8066;
-  fz_est =  -acc.dot(mea_R.col(2));
+  double fz_est_up = -acc.dot(mea_R.col(2));
+  double fz_avg = 0.5*(fz_est+fz_cmd);
+  fz_est =  std::abs((fz_est_up-fz_avg)/fz_avg)>=0.2 ? fz_cmd : fz_est_up;
 
   vel_up = 1;
 
@@ -120,8 +123,9 @@ int main(int argc, char **argv)
   std_msgs::Float64 debug_msg;
 
   // Define controller classes
-  // SE3Controller se3ctrl;
-  CCMController ccmctrl;
+  // SE3Controller ctrl;
+  CCMController ctrl;
+
 
   // Define trajectory class
   std::string traj_type;
@@ -159,8 +163,8 @@ int main(int argc, char **argv)
   Eigen::Vector3d takeoff_loc(0, 0, 0);
 
   // CCM values
-  fz_est = 0.0;
-  double fz_cmd = 9.8066;
+  fz_est = 9.8066;
+  fz_cmd = 9.8066;
   Eigen::Vector3d euler;
   Eigen::Vector3d euler_dot;
   vel_prev_t = 0.0;
@@ -169,14 +173,27 @@ int main(int argc, char **argv)
     // Check for state update
     ros::spinOnce();
 
-    //ROS_INFO("pose_up:%d, vel_up:%d", pose_up, vel_up);
+    debug_msg.data = r_pos(0);
+    debug_pub1.publish(debug_msg);
+    debug_msg.data = mea_pos(0);
+    debug_pub2.publish(debug_msg);
+
+    debug_msg.data = r_pos(1);
+    debug_pub3.publish(debug_msg);
+    debug_msg.data = mea_pos(1);
+    debug_pub4.publish(debug_msg);
+
+    debug_msg.data = r_pos(2);
+    debug_pub5.publish(debug_msg);
+    debug_msg.data = mea_pos(2);
+    debug_pub6.publish(debug_msg);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;
     time_prev = ros::Time::now().toSec();
 
     // Compare measured and commanded thrust
-    fz_cmd = ccmctrl.getfz();
+    fz_cmd = ctrl.getfz();
 
     if (current_mode == "OFFBOARD") {
 
@@ -184,7 +201,7 @@ int main(int argc, char **argv)
       if (!traj_started){
 
           traj_started = true;
-          ccmctrl.setMode(traj_started);
+          ctrl.setMode(traj_started);
 
           time_traj = 0.0;
 
@@ -206,7 +223,7 @@ int main(int argc, char **argv)
       //reset
       traj_started = false;
       time_traj = 0.0;
-      ccmctrl.setMode(traj_started);
+      ctrl.setMode(traj_started);
       r_vel.setZero(); r_acc.setZero(); r_jer.setZero();
     }
 
@@ -214,7 +231,7 @@ int main(int argc, char **argv)
     if (time_traj >= TAKEOFF_TIME) {
       // Once past takeoff time, start trajectory
       ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
-      traj->eval(time_traj-TAKEOFF_TIME, r_pos, r_vel, r_acc, r_jer);
+      traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer);
     } else {
       // smooth takeoff
       r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
@@ -222,44 +239,28 @@ int main(int argc, char **argv)
       //r_acc << 0.0, 0.0,(TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0));
     }
     // Update controller internal state
-    ccmctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, dt, pose_up, vel_up);
+    ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
+    ctrl.calcCCM(yaw_des, r_pos, r_vel, r_acc, r_jer);
 
-    // se3ctrl.updateVel(mea_vel, mea_wb, dt);
-    // se3ctrl.updatePose(mea_pos, mea_R);
+    // ctrl.updateVel(mea_vel, mea_wb, dt);
+    // ctrl.updatePose(mea_pos, mea_R);
+    // ctrl.calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
 
-    // compute control effort
-    // se3ctrl.calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
-    ccmctrl.calcCCM(yaw_des, r_pos, r_vel, r_acc, r_jer);
 
     // publish commands
     cmd.header.stamp = ros::Time::now();
     cmd.group_mix = 0;
     for(int i=0; i<4; i++) {
-      cmd.controls[i] = ccmctrl.motorCmd[i];
+      cmd.controls[i] = ctrl.motorCmd[i];
     }
     cmd.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
     actuatorPub.publish(cmd);
 
     // Publish
-    euler_dot = ccmctrl.getEulerdot();
-    euler = ccmctrl.getEuler();
 
-    debug_msg.data = r_pos(0);
-    debug_pub1.publish(debug_msg);
-    debug_msg.data = mea_pos(0);
-    debug_pub2.publish(debug_msg);
-
-    debug_msg.data = r_pos(1);
-    debug_pub3.publish(debug_msg);
-    debug_msg.data = mea_pos(1);
-    debug_pub4.publish(debug_msg);
-
-    debug_msg.data = r_pos(2);
-    debug_pub5.publish(debug_msg);
-    debug_msg.data = mea_pos(2);
-    debug_pub6.publish(debug_msg);
-
-    debug_msg.data = ccmctrl.getE();
+    euler_dot = ctrl.getEulerdot();
+    euler = ctrl.getEuler();
+    debug_msg.data = ctrl.getE();
     debug_pub7.publish(debug_msg);
 
     debug_msg.data = euler_dot(0);

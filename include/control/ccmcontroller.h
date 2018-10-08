@@ -30,6 +30,7 @@ private:
   Eigen::Vector3d mea_wb;
   Eigen::Vector3d mea_pos;
   Eigen::Vector3d mea_vel;
+  double fz;
 
 
   // CCM specific variables
@@ -104,7 +105,7 @@ public:
   // copy in updated state into controller class
   void updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d &R,
                    const Eigen::Vector3d &v, const Eigen::Vector3d &w,
-                   const double _dt, const int pose_up, const int vel_up);
+                   const double _fz, const double _dt, const int pose_up, const int vel_up);
 
   // compute
   void calcCCM(
@@ -121,7 +122,6 @@ public:
   Eigen::Vector3d getEuler();
 
   void setMode(const bool _m);
-  void setfz(double _fz);
 };
 
 

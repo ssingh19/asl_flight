@@ -151,10 +151,10 @@ add_executable(asl_traj_ctrl
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
 
-add_executable(Test_GeoProb
-  src/Test_GeoProb.cpp
-  src/GeoProb/Geodesic.cpp)
-target_link_libraries(Test_GeoProb ${catkin_LIBRARIES})
+#add_executable(Test_GeoProb
+#  src/Test_GeoProb.cpp
+#  src/GeoProb/Geodesic.cpp)
+#target_link_libraries(Test_GeoProb ${catkin_LIBRARIES})
 
 
 ## Rename C++ executable without prefix

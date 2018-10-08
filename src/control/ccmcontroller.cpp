@@ -7,11 +7,11 @@
 /********* Constructor ***********/
 CCMController::CCMController(void):
     active(false),
-    mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), dt(1.0),
+    mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
-    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),
-    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(0.998){
+    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),
+    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.29){
 
   // handle ros parameters
   ros::param::get("~KR", KR);
@@ -115,7 +115,7 @@ CCMController::CCMController(void):
 /********* State update ***********/
 void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d &R,
                                 const Eigen::Vector3d &v, const Eigen::Vector3d &w,
-                                const double _dt, const int pose_up, const int vel_up) {
+                                const double _fz, const double _dt, const int pose_up, const int vel_up) {
 
   dt = _dt;
   if (pose_up == 0 && active) {
@@ -125,13 +125,15 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
     Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
-  } else {mea_vel = v;}
+    fz = fzCmd;
+  } else {mea_vel = v; fz = _fz;}
 
   mea_R = R;
   mea_wb = w;
   R2euler_123();
 }
 
+/********* Coordinate conversions ***********/
 void CCMController::R2euler_123(void){
   euler(1) = std::asin(mea_R(0,2));
   euler(0) = std::atan2(-mea_R(1,2),mea_R(2,2));
@@ -142,6 +144,16 @@ void CCMController::Euler2R_123(const double r, const double p, const double y){
   _R_des <<  cos(p)*cos(y),-cos(p)*sin(y), sin(p),
              cos(r)*sin(y)+cos(y)*sin(p)*sin(r), cos(r)*cos(y)-sin(p)*sin(r)*sin(y), -cos(p)*sin(r),
              sin(r)*sin(y)-cos(r)*cos(y)*sin(p), cos(y)*sin(r)+cos(r)*sin(p)*sin(y),  cos(p)*cos(r);
+}
+
+void CCMController::R_om(const Eigen::Vector3d &q, const Eigen::Vector3d &q_dot){
+
+  Eigen::Matrix3d R_om;
+  R_om << std::cos(q(1))*std::cos(q(2)), std::sin(q(2)), 0.0,
+         -std::cos(q(1))*std::sin(q(2)), std::cos(q(2)), 0.0,
+          std::sin(q(1)), 0.0, 1.0;
+
+  r_wb = R_om * q_dot;
 }
 
 /********* CCM fncs ***********/
@@ -198,16 +210,6 @@ void CCMController::calc_CCM_dyn(const Eigen::VectorXd &xc,const Eigen::Vector4d
 
 }
 
-void CCMController::R_om(const Eigen::Vector3d &q, const Eigen::Vector3d &q_dot){
-
-  Eigen::Matrix3d R_om;
-  R_om << std::cos(q(1))*std::cos(q(2)), std::sin(q(2)), 0.0,
-         -std::cos(q(1))*std::sin(q(2)), std::cos(q(2)), 0.0,
-          std::sin(q(1)), 0.0, 1.0;
-
-  r_wb = R_om * q_dot;
-}
-
 /********* Return fncs ***********/
 double CCMController::getE(){
   return E;
@@ -247,7 +249,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fzCmd, euler;
+    _xc << mea_pos, mea_vel, fz, euler;
 
     // Update Geodesic prob
     // geovar_ptr->UpdateInit(_xc_nom,_xc);
@@ -283,10 +285,8 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     Eigen::Vector4d b = (2.0*X_dot_EndP.col(1).transpose()*_M*_B_ctrl).transpose();
 
     uc_fb.setZero();
-    if (b.norm()>1e-5) {
-      if (a > 0){
-        uc_fb = -(a/b.squaredNorm()) * b;
-      }
+    if (b.norm()> 0.0 && a > 0.0){
+      uc_fb = -(a/b.norm()) * b.normalized();
     }
 
     // Debug controller comp
@@ -313,6 +313,9 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
     // Update desired euler_dot_rate
     euler_dot << _uc_nom(1)+uc_fb(1),_uc_nom(2)+uc_fb(2),_uc_nom(3)+uc_fb(3);
+    for (int i = 0; i<3; i++){
+      euler_dot(i) = std::max(std::min(euler_dot(i),1.5),-1.5);
+    }
 
   } else {
     uc_fb.setZero();
@@ -325,7 +328,8 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
   R_om(euler,euler_dot);
 
   Eigen::Vector3d ew = mea_wb-r_wb;
-  tauCmd = -KW*ew + mea_wb.cross(J*mea_wb) -J*mea_wb.cross(r_wb);
+  tauCmd = -KW*ew + mea_wb.cross(J*mea_wb) -
+            J*mea_wb.cross(r_wb);
 
   Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
   Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);

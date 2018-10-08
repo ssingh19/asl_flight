@@ -85,6 +85,10 @@ void SE3Controller::joySE3(void) {
   calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
 }
 
+double SE3Controller::getfz(){
+  return fzCmd;
+}
+
 void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos, const Eigen::Vector3d &r_vel,
           const Eigen::Vector3d &r_acc, const Eigen::Vector3d &r_jer) {
 

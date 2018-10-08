@@ -70,6 +70,8 @@ public:
           const Eigen::Vector3d &r_acc,
           const Eigen::Vector3d &r_jer);
   void joySE3(void); // give reference input to SE3 controller from joystick. This enables manual joystick control
+
+  double getfz();
 };
 
 
