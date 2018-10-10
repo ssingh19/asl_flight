@@ -68,40 +68,12 @@ CCMController::CCMController(void):
   _B_ctrl << Eigen::MatrixXd::Zero(6,4),
              Eigen::MatrixXd::Identity(4,4);
 
-  // Initialize geo_Prob
-  // int N = 3;
-  // geo_Prob = new ifopt::Problem;
-  // ipopt = new ifopt::IpoptSolver;
-  // geovar_ptr = std::make_shared<ifopt::GeoVariables>(N);
-  // geocon_ptr = std::make_shared<ifopt::GeoConstraint>(N);
-  // geo_Prob->AddVariableSet  (geovar_ptr);
-  // geo_Prob->AddConstraintSet(geocon_ptr);
-  // geo_Prob->AddCostSet      (std::make_shared<ifopt::GeoCost>(N));
-  // geo_Prob->PrintCurrent();
-  // ipopt->SetOption("linear_solver", "mumps");
-  // ipopt->SetOption("jacobian_approximation", "exact");
-  // ipopt->SetOption("tol",0.000000001);
-  // ipopt->SetOption("print_level",0);
-  // ipopt->SetOption("sb","yes");
-  // c_opt = Eigen::VectorXd::Constant((N+1)*9,0.0);
 
-
-  // Initialize geo solution struct
-  // X_dot_Geod = Eigen::MatrixXd(9,2);
+  // Initialize geodesic endpoints
   X_dot_EndP = Eigen::MatrixXd(10,2);
-  // Eigen::MatrixXd T_dot_EndP(N+1,2);
-  // Eigen::Vector2d t(-1.0,1.0);
-  // geodesic::compute_cheby_d(T_dot_EndP,N,1,t);
-  // Jacobian basis(9,9*(N+1));
-  // basis.reserve(Eigen::VectorXi::Constant(9,N+1));
-  // Phi_dot = std::vector<Jacobian> (2,basis);
-  // for (int k=0; k<2; k++){
-  //   for (int i=0; i<9; i++){
-  //     for (int j=0; j<N+1; j++){
-  //       Phi_dot[k].insert(i,i*(N+1)+j) = 2.0*T_dot_EndP(j,k);
-  //     }
-  //   }
-  // }
+
+  // Initialize Controller
+  setMode(false);
 
   // Readout
   std::cout << "CCM Using the following parameters: " << std::endl;
@@ -204,7 +176,7 @@ void CCMController::calc_CCM_dyn(const Eigen::VectorXd &xc,const Eigen::Vector4d
   Eigen::Vector3d b_T(sin(p), -cos(p)*sin(r), cos(p)*cos(r));
 
   Eigen::VectorXd f(10);
-  f << xc(3), xc(4), xc(5), -xc(6)*b_T(0), -xc(6)*b_T(1), g-xc(6)*b_T(2), 0,0,0,0;
+  f << xc(3), xc(4), xc(5), -xc(6)*b_T(0), -xc(6)*b_T(1), g-xc(6)*b_T(2), 0.,0.,0.,0.;
 
   dyn = f + _B_ctrl*uc;
 
@@ -251,20 +223,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     // Now compute actual xc
     _xc << mea_pos, mea_vel, fz, euler;
 
-    // Update Geodesic prob
-    // geovar_ptr->UpdateInit(_xc_nom,_xc);
-    // geocon_ptr->update_bounds(_xc_nom,_xc);
-
-    // Solve Geodesic prob
-    // ipopt->Solve(*geo_Prob);
-    // c_opt = geo_Prob->GetOptVariables()->GetValues();
-    // c_opt = geo_Prob->GetVariableValues();
-    // X_dot_Geod.col(0) = Phi_dot[0]*c_opt;
-    // X_dot_Geod.col(1) = Phi_dot[1]*c_opt;
-
-    // Augment solution with yaw
-    // X_dot_EndP.col(0) << X_dot_Geod.col(0), euler(2)-yaw_des;
-    // X_dot_EndP.col(1) << X_dot_Geod.col(1), euler(2)-yaw_des;
+    // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
     X_dot_EndP.col(1) = _xc - _xc_nom;
 
@@ -324,7 +283,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     fzCmd = g;
   }
 
-  // Convert to desired omega
+  // Convert to desired omega (r_wb)
   R_om(euler,euler_dot);
 
   Eigen::Vector3d ew = mea_wb-r_wb;

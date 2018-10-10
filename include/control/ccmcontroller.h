@@ -8,17 +8,13 @@
 #include "geometry_msgs/TwistStamped.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <ifopt/problem.h>
-#include <ifopt/ipopt_solver.h>
-#include <GeoProb/GeoProb.h>
 #include <GeoProb/Geodesic.h>
 #include <GeoProb/Metric.h>
 
 
 class CCMController {
 private:
-  using Jacobian = ifopt::Component::Jacobian;
-
+  
   ros::NodeHandle nh;
 
   // Mode
@@ -35,6 +31,7 @@ private:
 
   // CCM specific variables
   Eigen::VectorXd _xc_nom;
+  Eigen::Matrix3d _R_des;
   Eigen::Vector4d _uc_nom;
   Eigen::VectorXd _xc;
   Eigen::VectorXd _xc_nom_dot;
@@ -43,18 +40,8 @@ private:
   Eigen::MatrixXd _W;
   Eigen::MatrixXd _M_nom;
   Eigen::MatrixXd _M;
-  // Eigen::MatrixXd X_dot_Geod;
   Eigen::MatrixXd X_dot_EndP;
-  // std::vector<Jacobian> Phi_dot;
   double _M_yaw;
-  Eigen::Matrix3d _R_des;
-
-  // Geodesic Problem
-  // ifopt::Problem* geo_Prob;
-  // ifopt::IpoptSolver* ipopt;
-  // std::shared_ptr<ifopt::GeoVariables> geovar_ptr;
-  // std::shared_ptr<ifopt::GeoConstraint> geocon_ptr;
-  // Eigen::VectorXd c_opt;
 
   // use for integration
   double dt;

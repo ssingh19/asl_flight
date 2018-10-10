@@ -21,6 +21,7 @@ compute_dW(const VectorXd &x, MatrixXd &dW, const int j);
 double
 mono_eval(const Vector3d &x, const Vector3d &p, const bool d, const int j);
 
+/*
 void
 compute_cheby(MatrixXd &C, const int N, const int K, const VectorXd &t);
 
@@ -29,6 +30,7 @@ compute_cheby_d(MatrixXd &C, const int N, const int K, const VectorXd &t);
 
 void
 clencurt(int K, VectorXd &t, VectorXd &w);
+*/
 
 }
 

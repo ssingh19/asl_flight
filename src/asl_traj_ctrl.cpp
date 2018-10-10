@@ -10,9 +10,6 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 
-#include <ifopt/problem.h>
-#include <ifopt/ipopt_solver.h>
-#include <GeoProb/GeoProb.h>
 #include <GeoProb/Geodesic.h>
 #include <GeoProb/Metric.h>
 
@@ -173,6 +170,7 @@ int main(int argc, char **argv)
     // Check for state update
     ros::spinOnce();
 
+    // Publish tracking results
     debug_msg.data = r_pos(0);
     debug_pub1.publish(debug_msg);
     debug_msg.data = mea_pos(0);
@@ -192,7 +190,7 @@ int main(int argc, char **argv)
     dt = ros::Time::now().toSec() - time_prev;
     time_prev = ros::Time::now().toSec();
 
-    // Compare measured and commanded thrust
+    // Get commanded normalized thrust
     fz_cmd = ctrl.getfz();
 
     if (current_mode == "OFFBOARD") {
@@ -257,9 +255,9 @@ int main(int argc, char **argv)
     actuatorPub.publish(cmd);
 
     // Publish
-
     euler_dot = ctrl.getEulerdot();
     euler = ctrl.getEuler();
+
     debug_msg.data = ctrl.getE();
     debug_pub7.publish(debug_msg);
 

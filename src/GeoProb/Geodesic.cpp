@@ -39,6 +39,7 @@ mono_eval(const Vector3d &x, const Vector3d &p, const bool d, const int j){
   return val;
 }
 
+/*
 void
 compute_cheby(MatrixXd &C, const int N, const int K, const VectorXd &t){
   C.setZero();
@@ -87,5 +88,6 @@ clencurt(int K, VectorXd &t, VectorXd &w){
 
   w.segment(1,K-1) = (2.0/(1.0*K))*v.matrix();
 }
+*/
 
 } // namespace geodesic
