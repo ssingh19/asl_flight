@@ -14,7 +14,7 @@
 
 class CCMController {
 private:
-  
+
   ros::NodeHandle nh;
 
   // Mode
@@ -79,6 +79,9 @@ private:
                       const Eigen::Vector3d &r_acc,
                       const Eigen::Vector3d &r_jer,
                       const double yaw_des); // compute xc, uc nom
+
+  // Motor mixing
+  void motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff);
 
   // Coordinate conversions
   void R2euler_123(void);

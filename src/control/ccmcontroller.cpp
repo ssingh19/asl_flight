@@ -221,7 +221,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fz, euler;
+    _xc << mea_pos, mea_vel, fzCmd, euler;
 
     // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
@@ -290,9 +290,15 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
   tauCmd = -KW*ew + mea_wb.cross(J*mea_wb) -
             J*mea_wb.cross(r_wb);
 
+  // Get desired forces
   Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
   Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);
 
+  // Mix
+  motor_mix(wrench, ffff);
+}
+
+void CCMController::motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff){
   // Find worst violator
   bool sat = false;
   double worst_viol = 0.0;
@@ -332,10 +338,22 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     }
   }
 
-  // std::cout << fzCmd << std::endl;
+  const double c_a =  4.67636;
+  const double c_b =  1.68915;
+  const double c_c = -0.05628;
 
   for(int i=0; i<4; i++) {
-    motorCmd[i] = ffff(i)/TCOEFF;
+      motorCmd[i]  = (-c_b + sqrt( (c_b*c_b) - (4*c_a*(c_c - ffff(i))) ) )/(2*c_a);
+
+      if (motorCmd[i] < 0) {
+      motorCmd[i] = 0;
+      }
+      else if (motorCmd[i] > 1.0) {
+      motorCmd[i] = 1.0;
+      }
+      else {
+      // Carry On
+      }
   }
 
 }

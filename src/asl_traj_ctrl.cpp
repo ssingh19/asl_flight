@@ -233,8 +233,6 @@ int main(int argc, char **argv)
     } else {
       // smooth takeoff
       r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
-      //r_vel(2) = (TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0))*(time_traj-TAKEOFF_TIME);
-      //r_acc << 0.0, 0.0,(TAKEOFF_HGT/std::pow(TAKEOFF_TIME,2.0));
     }
     // Update controller internal state
     ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
