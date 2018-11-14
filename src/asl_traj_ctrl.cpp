@@ -94,9 +94,9 @@ int main(int argc, char **argv)
   ros::NodeHandle nh;
 
   // Subscriptions
-  ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("/mavros/state", 1, state_cb);
-  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, poseSubCB);
-  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("/mavros/local_position/velocity", 1, velSubCB);
+  ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 1, state_cb);
+  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 1, poseSubCB);
+  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 1, velSubCB);
 
   pose_up = 0; vel_up = 0;
 
