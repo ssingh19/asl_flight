@@ -71,10 +71,10 @@ find_package(Eigen3 REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
+ generate_messages(
+   DEPENDENCIES
 #   std_msgs  # Or other packages containing msgs
-# )
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##

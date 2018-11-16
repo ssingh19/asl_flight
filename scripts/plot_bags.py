@@ -30,14 +30,14 @@ for c in debug_channels:
 for topic,msg,t in bag.read_messages(topics=debug_channels):
     debug_data[topic].append(msg.data)
 
+# XY plot
+layout = go.Layout(height=600,width=600,)
+offline.plot({'data':[ {'x': debug_data['/debug1'], 'y':debug_data['/debug3']},{'x': debug_data['/debug2'], 'y':debug_data['/debug4']}], 'layout': layout})
+
 # %%
 
-#offline.plot({'data':[ {'x': debug_data['/debug1'], 'y':debug_data['/debug3']},{'x': debug_data['/debug2'], 'y':debug_data['/debug4']}]})# for k in debug_channels], 'layout': layout})
-
-# %%
-
-#debug_channels = ['/debug10','/debug11','/debug12']
-offline.plot({'data':[ {'y': debug_data[k]} for k in debug_channels]})
+# plot channels
+#offline.plot({'data':[ {'y': debug_data[k]} for k in debug_channels]})
 
 
 # %%

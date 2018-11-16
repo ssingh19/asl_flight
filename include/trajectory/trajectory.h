@@ -17,39 +17,6 @@ public:
   virtual void set_start_pos(const Eigen::Vector3d &_start_pos) {};
 };
 
-/*
-class ConstTrajectory: public Trajectory
-{
-public:
-  ConstTrajectory(int m, double c);
-  VectorXd eval(double t);
-
-  void set_output(int index, double value);
-
-private:
-  VectorXd output;
-};
-
-class PolyTrajectory: public Trajectory
-{
-public:
-  PolyTrajectory(double _start_delay, double _scale);
-  VectorXd eval(double t);
-
-  void set_start_pos(VectorXd& _start_pos);
-
-private:
-  VectorXd start_pos;
-  VectorXd time;
-  std::vector<MatrixXd> cp;
-  double start_delay;
-  double scale;
-
-  MatrixXd expand_coeffs(MatrixXd& _coeffs);
-
-};
-*/
-
 class HoverTrajectory: public Trajectory {
 private:
   Eigen::Vector3d start_pos;

@@ -11,7 +11,7 @@ CCMController::CCMController(void):
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
     fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),
-    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.29){
+    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.25){
 
   // handle ros parameters
   ros::param::get("~KR", KR);
@@ -59,7 +59,7 @@ CCMController::CCMController(void):
   _M = _M_nom;
 
   double d_bar = 0.0420;
-  double yaw_bound = 45.0*PI/180.0;
+  double yaw_bound = 5.0*PI/180.0;
   _M_yaw = std::pow((d_bar/yaw_bound),2.0);
   _M_nom(9,9) = _M_yaw;
   _M(9,9) = _M_yaw;
@@ -192,7 +192,7 @@ double CCMController::getfz(){
 }
 
 Eigen::Vector3d CCMController::getEulerdot(){
-  return euler_dot;
+  return r_wb;
 }
 
 Eigen::Vector3d CCMController::getEuler(){
@@ -221,7 +221,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fzCmd, euler;
+    _xc << mea_pos, mea_vel, fz, euler;
 
     // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
@@ -287,8 +287,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
   R_om(euler,euler_dot);
 
   Eigen::Vector3d ew = mea_wb-r_wb;
-  tauCmd = -KW*ew + mea_wb.cross(J*mea_wb) -
-            J*mea_wb.cross(r_wb);
+  tauCmd = -KW*ew; // + mea_wb.cross(J*mea_wb) -J*mea_wb.cross(r_wb);
 
   // Get desired forces
   Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
@@ -343,7 +342,8 @@ void CCMController::motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff){
   const double c_c = -0.05628;
 
   for(int i=0; i<4; i++) {
-      motorCmd[i]  = (-c_b + sqrt( (c_b*c_b) - (4*c_a*(c_c - ffff(i))) ) )/(2*c_a);
+      //motorCmd[i]  = (-c_b + sqrt( (c_b*c_b) - (4*c_a*(c_c - ffff(i))) ) )/(2*c_a);
+      motorCmd[i] = ffff(i)/TCOEFF;
 
       if (motorCmd[i] < 0) {
       motorCmd[i] = 0;

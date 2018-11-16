@@ -6,7 +6,7 @@
 SE3Controller::SE3Controller(void):
     MODEL("aslquad"), KP(4.0), KV(6.0), KR(0.3), KW(0.05),
     M(1.04), g(9.8), TCOEFF(4.4), mea_pos(0,0,0), mea_vel(0,0,0),
-    mea_wb(0,0,0), dt(1.0), lpf(1.0), fzCmd_prev(0.0) {
+    mea_wb(0,0,0), dt(1.0), fz(9.8066) {
   // handle ros parameters
   ros::param::get("~KP", KP);
   ros::param::get("~KV", KV);
@@ -17,7 +17,7 @@ SE3Controller::SE3Controller(void):
   ros::param::get("~MODEL", MODEL);
 
   if(MODEL=="aslquad") {
-    W << 1, 1, 1, 1,
+    A << 1, 1, 1, 1,
         -0.12, 0.12, 0.12, -0.12,
         -0.12, 0.12, -0.12, 0.12,
         -0.06, -0.06, 0.06, 0.06;
@@ -26,7 +26,7 @@ SE3Controller::SE3Controller(void):
 
   } else if(MODEL=="iris") {
     // Iris in Gazebo (ENU torque command)
-    W << 1, 1, 1, 1,
+    A << 1, 1, 1, 1,
         -0.22, 0.2, 0.22, -0.2,
         -0.13, 0.13, -0.13, 0.13,
         -0.06, -0.06, 0.06, 0.06;
@@ -51,42 +51,29 @@ SE3Controller::SE3Controller(void):
   std::cout << "TCOEFF = " << TCOEFF << std::endl;
   std::cout << "MODEL: " << MODEL << std::endl;
 
-  joySub = nh.subscribe<sensor_msgs::Joy>("/joy", 10, &SE3Controller::joyCB, this);
 }
 
-void SE3Controller::updatePose(const Eigen::Vector3d &r, const Eigen::Matrix3d &R) {
-  mea_pos = r;
-  mea_R = R;
-}
+/********* State update ***********/
+void SE3Controller::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d &R,
+                                const Eigen::Vector3d &v, const Eigen::Vector3d &w,
+                                const double _fz, const double _dt, const int pose_up, const int vel_up) {
 
-void SE3Controller::updateVel(const Eigen::Vector3d &v, const Eigen::Vector3d &w, const double &_dt) {
-  vel_prev = mea_vel;
-  mea_vel = v;
   dt = _dt;
+  if (pose_up == 0 && active) {
+    mea_pos += 0.5*(v+mea_vel)*dt;
+  } else { mea_pos = r;}
+  if (vel_up == 0 && active) {
+    Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
+    accel(2) += g;
+    mea_vel += accel*dt;
+  } else {mea_vel = v; fz = _fz;}
 
+  mea_R = R;
   mea_wb = w;
 }
 
-void SE3Controller::joyCB(const sensor_msgs::Joy::ConstPtr& joy) {
-  joyCmd[0] = 0.2*joy->axes[3]; // [-2,2], can go either up or down
-  joyCmd[1] = -0.2*joy->axes[0];
-  joyCmd[2] = 0.2*joy->axes[1];
-  joyCmd[3] = 1.0*joy->axes[2];
-}
-
-void SE3Controller::joySE3(void) {
-  KP = 0.0; // need to disable position control
-  double yaw_des =  joyCmd[3];
-  Eigen::Vector3d r_wb(0, 0, 0);
-  Eigen::Vector3d r_pos(0, 0, 0);
-  Eigen::Vector3d r_vel(joyCmd[2], -joyCmd[1], joyCmd[0]);
-  Eigen::Vector3d r_acc(0, 0, 0);
-  Eigen::Vector3d r_jer(0, 0, 0);
-  calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
-}
-
 double SE3Controller::getfz(){
-  return fzCmd;
+  return FzCmd/M;
 }
 
 void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos, const Eigen::Vector3d &r_vel,
@@ -95,10 +82,10 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
   // Compute desired thrust
   Eigen::Vector3d e3(0.0,0.0,1.0);
   Eigen::Vector3d Fdes = -KP*(mea_pos-r_pos) - KV*(mea_vel-r_vel) - M*g*e3 + M*r_acc;
-  fzCmd = -Fdes.dot(mea_R.col(2));
+  FzCmd = -Fdes.dot(mea_R.col(2));
 
   // Compute desired attitude
-  Eigen::Vector3d zb_des = -Fdes / fzCmd;
+  Eigen::Vector3d zb_des = -Fdes / FzCmd;
   Eigen::Vector3d yc_des(-std::sin(yaw_des), std::cos(yaw_des), 0.0); // only need yaw from reference euler
   Eigen::Vector3d xb = yc_des.cross(zb_des);
   Eigen::Vector3d xb_des = xb.normalized();
@@ -110,14 +97,9 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
   R_des.col(2) = zb_des;
 
   // Compute desired body Rate
-  Eigen::Vector3d acc = g*e3 - (fzCmd/M)*mea_R.col(2);
-  fzCmd_prev = fzCmd;
-
-  if (dt >= 0.001){
-    acc = lpf*acc + (1.0-lpf)*(mea_vel - vel_prev)/dt;
-  }
+  Eigen::Vector3d acc = g*e3 - fz*mea_R.col(2);
   Eigen::Vector3d Fdes_dot = -KP*(mea_vel-r_vel) - KV*(acc-r_acc) + M*r_jer;
-  Eigen::Vector3d zb_des_dot = (zb_des.dot(Fdes_dot)/fzCmd)*zb_des - (1.0/fzCmd)*Fdes_dot;
+  Eigen::Vector3d zb_des_dot = (zb_des.dot(Fdes_dot)/FzCmd)*zb_des - (1.0/FzCmd)*Fdes_dot;
   Eigen::Vector3d om_skew_des = R_des.transpose()*zb_des_dot;
   double om_z_des = (om_skew_des(0)/R_des(1,1))*R_des(1,2);
   Eigen::Vector3d r_wb(-om_skew_des(1),om_skew_des(0),om_z_des);
@@ -135,12 +117,71 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
   //std::cout << "fzCmd = " << fzCmd << std::endl;
   //std::cout << "tauCmd = " << tauCmd << std::endl;
 
-  Eigen::Vector4d wrench(fzCmd, tauCmd(0), -tauCmd(1), -tauCmd(2));
-  Eigen::Vector4d ffff = W.colPivHouseholderQr().solve(wrench);
+  // Get desired forces
+  Eigen::Vector4d wrench(FzCmd, tauCmd(0), -tauCmd(1), -tauCmd(2));
+  Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);
 
-  //std::cout << ffff << std::endl;
+  // Mix
+  motor_mix(wrench, ffff);
+}
+
+void SE3Controller::motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff){
+  // Find worst violator
+  bool sat = false;
+  double worst_viol = 0.0;
+  int worst_f = 0;
+  double f_min = 0.1*mass*g/4.0;
+  for (int i = 0; i<4; i++){
+    if (ffff(i) < f_min || ffff(i) > TCOEFF) {
+      sat = true;
+      double low_pen = std::abs(std::min(ffff(i)-f_min,0.0));
+      double high_pen = std::abs(std::max(ffff(i)-TCOEFF,0.0));
+      if ( low_pen > worst_viol || high_pen > worst_viol ) {
+        worst_viol = std::max(low_pen,high_pen);
+        worst_f = i;
+      }
+    }
+  }
+  // Tune down tau_z, while maintaining thrust and tau_xy
+  if (sat){
+    ffff(worst_f) = ffff(worst_f) < f_min ? f_min : TCOEFF;
+    Eigen::Matrix4d A_up = A;
+    int i_up = 0;
+    for (int i=0; i<4; i++){
+      if (i!=worst_f){
+        A_up.col(i_up) = A.col(i);
+        i_up += 1;
+      }
+    }
+    A_up.col(3) = Eigen::Vector4d(0.0,0.0,0.0,1.0);
+    wrench(3) = 0.0;
+    Eigen::Vector4d ffff_up = A_up.colPivHouseholderQr().solve(wrench-ffff(worst_f)*A.col(worst_f));
+    i_up = 0;
+    for (int i=0; i<4; i++){
+      if (i!=worst_f){
+        ffff(i) = ffff_up(i_up);
+        i_up += 1;
+      }
+    }
+  }
+
+  const double c_a =  4.67636;
+  const double c_b =  1.68915;
+  const double c_c = -0.05628;
+
   for(int i=0; i<4; i++) {
-    motorCmd[i] = ffff(i)/TCOEFF;
+      //motorCmd[i]  = (-c_b + sqrt( (c_b*c_b) - (4*c_a*(c_c - ffff(i))) ) )/(2*c_a);
+      motorCmd[i] = ffff(i)/TCOEFF;
+
+      if (motorCmd[i] < 0) {
+      motorCmd[i] = 0;
+      }
+      else if (motorCmd[i] > 1.0) {
+      motorCmd[i] = 1.0;
+      }
+      else {
+      // Carry On
+      }
   }
 
 }
