@@ -5,14 +5,14 @@
 
 SE3Controller::SE3Controller(void):
     MODEL("aslquad"), KP(4.0), KV(6.0), KR(0.3), KW(0.05),
-    M(1.04), g(9.8), TCOEFF(4.4), mea_pos(0,0,0), mea_vel(0,0,0),
+    mass(1.04), g(9.8), TCOEFF(4.4), mea_pos(0,0,0), mea_vel(0,0,0),
     mea_wb(0,0,0), dt(1.0), fz(9.8066) {
   // handle ros parameters
   ros::param::get("~KP", KP);
   ros::param::get("~KV", KV);
   ros::param::get("~KR", KR);
   ros::param::get("~KW", KW);
-  ros::param::get("~M", M);
+  ros::param::get("~M", mass);
   ros::param::get("~TCOEFF", TCOEFF);
   ros::param::get("~MODEL", MODEL);
 
@@ -47,7 +47,7 @@ SE3Controller::SE3Controller(void):
   std::cout << "KV = " << KV << std::endl;
   std::cout << "KR = " << KR << std::endl;
   std::cout << "KW = " << KW << std::endl;
-  std::cout << "M = " << M << std::endl;
+  std::cout << "M = " << mass << std::endl;
   std::cout << "TCOEFF = " << TCOEFF << std::endl;
   std::cout << "MODEL: " << MODEL << std::endl;
 
@@ -59,11 +59,11 @@ void SE3Controller::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
                                 const double _fz, const double _dt, const int pose_up, const int vel_up) {
 
   dt = _dt;
-  if (pose_up == 0 && active) {
+  if (pose_up == 0) {
     mea_pos += 0.5*(v+mea_vel)*dt;
   } else { mea_pos = r;}
-  if (vel_up == 0 && active) {
-    Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
+  if (vel_up == 0) {
+    Eigen::Vector3d accel = -(FzCmd/mass)*mea_R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
   } else {mea_vel = v; fz = _fz;}
@@ -73,7 +73,7 @@ void SE3Controller::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 }
 
 double SE3Controller::getfz(){
-  return FzCmd/M;
+  return FzCmd/mass;
 }
 
 void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos, const Eigen::Vector3d &r_vel,
@@ -81,7 +81,7 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
   // Compute desired thrust
   Eigen::Vector3d e3(0.0,0.0,1.0);
-  Eigen::Vector3d Fdes = -KP*(mea_pos-r_pos) - KV*(mea_vel-r_vel) - M*g*e3 + M*r_acc;
+  Eigen::Vector3d Fdes = -KP*(mea_pos-r_pos) - KV*(mea_vel-r_vel) - mass*g*e3 + mass*r_acc;
   FzCmd = -Fdes.dot(mea_R.col(2));
 
   // Compute desired attitude
@@ -98,7 +98,7 @@ void SE3Controller::calcSE3(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
   // Compute desired body Rate
   Eigen::Vector3d acc = g*e3 - fz*mea_R.col(2);
-  Eigen::Vector3d Fdes_dot = -KP*(mea_vel-r_vel) - KV*(acc-r_acc) + M*r_jer;
+  Eigen::Vector3d Fdes_dot = -KP*(mea_vel-r_vel) - KV*(acc-r_acc) + mass*r_jer;
   Eigen::Vector3d zb_des_dot = (zb_des.dot(Fdes_dot)/FzCmd)*zb_des - (1.0/FzCmd)*Fdes_dot;
   Eigen::Vector3d om_skew_des = R_des.transpose()*zb_des_dot;
   double om_z_des = (om_skew_des(0)/R_des(1,1))*R_des(1,2);

@@ -36,7 +36,7 @@ private:
   double KW;
 
   // constants
-  double M;
+  double mass;
   double g;
   double TCOEFF;
   std::string MODEL;

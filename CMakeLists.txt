@@ -143,13 +143,20 @@ add_compile_options(-std=c++11)
 
 add_executable(asl_traj_ctrl
   src/asl_traj_ctrl.cpp
-  src/control/se3controller.cpp
   src/control/ccmcontroller.cpp
   src/GeoProb/Geodesic.cpp
   src/trajectory/circle_trajectory.cpp
   src/trajectory/hover_trajectory.cpp)
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
+
+add_executable(se3_traj_ctrl
+  src/se3_traj_ctrl.cpp
+  src/control/se3controller.cpp
+  src/trajectory/circle_trajectory.cpp
+  src/trajectory/hover_trajectory.cpp)
+add_dependencies(se3_traj_ctrl ${PROJECT_NAME}_gencfg)
+target_link_libraries(se3_traj_ctrl ${catkin_LIBRARIES})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

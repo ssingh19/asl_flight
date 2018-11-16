@@ -91,7 +91,7 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "asl_traj_ctrl");
+  ros::init(argc, argv, "se3_traj_ctrl");
   ros::NodeHandle nh;
 
   // Subscriptions
@@ -102,14 +102,13 @@ int main(int argc, char **argv)
   pose_up = 0; vel_up = 0;
 
   // Actuator publisher
-  //ros::Publisher actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
-  ros::Publisher omegaPub = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_attitude/cmd_vel", 2);
-  ros::Publisher throttlePub = nh.advertise<mavros_msgs::Thrust>("mavros/setpoint_attitude/thrust", 2);
+  ros::Publisher actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
+  //ros::Publisher omegaPub = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_attitude/cmd_vel", 2);
+  //ros::Publisher throttlePub = nh.advertise<mavros_msgs::Thrust>("mavros/setpoint_attitude/thrust", 2);
 
-  //mavros_msgs::ActuatorControl cmd;
-  geometry_msgs::TwistStamped omega_sp;
-  mavros_msgs::Thrust throttle_sp;
-
+  mavros_msgs::ActuatorControl cmd;
+  // geometry_msgs::TwistStamped omega_sp;
+  // mavros_msgs::Thrust throttle_sp;
 
   // DEBUG PUBLICATIONS
   ros::Publisher debug_pub1 = nh.advertise<std_msgs::Float64>("/debug1", 1);
@@ -120,15 +119,11 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub6 = nh.advertise<std_msgs::Float64>("/debug6", 1);
   ros::Publisher debug_pub7 = nh.advertise<std_msgs::Float64>("/debug7", 1);
   ros::Publisher debug_pub8 = nh.advertise<std_msgs::Float64>("/debug8", 1);
-  ros::Publisher debug_pub9 = nh.advertise<std_msgs::Float64>("/debug9", 1);
-  ros::Publisher debug_pub10 = nh.advertise<std_msgs::Float64>("/debug10", 1);
-  ros::Publisher debug_pub11 = nh.advertise<std_msgs::Float64>("/debug11", 1);
-  ros::Publisher debug_pub12 = nh.advertise<std_msgs::Float64>("/debug12", 1);
+
   std_msgs::Float64 debug_msg;
 
   // Define controller classes
-  CCMController ctrl;
-
+  SE3Controller ctrl;
 
   // Define trajectory class
   std::string traj_type;
@@ -168,8 +163,6 @@ int main(int argc, char **argv)
   // CCM values
   fz_est = 9.8066;
   fz_cmd = 9.8066;
-  Eigen::Vector3d euler;
-  Eigen::Vector3d euler_dot;
   vel_prev_t = 0.0;
 
   while(ros::ok()) {
@@ -196,9 +189,9 @@ int main(int argc, char **argv)
     fz_cmd = ctrl.getfz();
 
     debug_msg.data = fz_cmd;
-    debug_pub11.publish(debug_msg);
+    debug_pub7.publish(debug_msg);
     debug_msg.data = fz_est;
-    debug_pub12.publish(debug_msg);
+    debug_pub8.publish(debug_msg);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;
@@ -210,7 +203,6 @@ int main(int argc, char **argv)
       if (!traj_started){
 
           traj_started = true;
-          ctrl.setMode(traj_started);
 
           time_traj = 0.0;
 
@@ -232,7 +224,6 @@ int main(int argc, char **argv)
       //reset
       traj_started = false;
       time_traj = 0.0;
-      ctrl.setMode(traj_started);
       r_vel.setZero(); r_acc.setZero(); r_jer.setZero();
     }
 
@@ -247,10 +238,9 @@ int main(int argc, char **argv)
     }
     // Update controller internal state
     ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
-    ctrl.calcCCM(yaw_des, r_pos, r_vel, r_acc, r_jer);
+    ctrl.calcSE3(yaw_des, r_pos, r_vel, r_acc, r_jer);
 
     // publish commands
-    /*
     cmd.header.stamp = ros::Time::now();
     cmd.group_mix = 0;
     for(int i=0; i<4; i++) {
@@ -258,8 +248,7 @@ int main(int argc, char **argv)
     }
     cmd.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
     actuatorPub.publish(cmd);
-    */
-
+    /*
     fz_cmd = ctrl.getfz();
     euler_dot = ctrl.getEulerdot();
 
@@ -272,20 +261,7 @@ int main(int argc, char **argv)
     omega_sp.twist.angular.y = euler_dot(0);
     omega_sp.twist.angular.z = -euler_dot(2);
     omegaPub.publish(omega_sp);
-
-    // Publish
-    euler = ctrl.getEuler();
-
-    debug_msg.data = ctrl.getE();
-    debug_pub7.publish(debug_msg);
-
-    debug_msg.data = euler_dot(0);
-    debug_pub8.publish(debug_msg);
-    debug_msg.data = euler_dot(1);
-    debug_pub9.publish(debug_msg);
-    debug_msg.data = euler_dot(2);
-    debug_pub10.publish(debug_msg);
-
+    */
     // Reset update
     pose_up = 0; vel_up = 0;
     // Check for state update
