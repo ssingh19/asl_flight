@@ -1,6 +1,5 @@
 #include <iostream>
 #include <control/se3controller.h>
-#include <control/ccmcontroller.h>
 #include <trajectory/trajectory.h>
 #include <std_msgs/Float64.h>
 #include "mavros_msgs/Thrust.h"
@@ -10,9 +9,6 @@
 #include <string>
 #include <ros/ros.h>
 #include <ros/console.h>
-
-#include <GeoProb/Geodesic.h>
-#include <GeoProb/Metric.h>
 
 #define TAKEOFF_TIME 5.0
 #define THROTTLE_SCALE 0.51
@@ -129,6 +125,9 @@ int main(int argc, char **argv)
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
   Trajectory* traj;
+  double circle_freq;
+  ros::param::get("~CIRCLE_FREQ", circle_freq);
+
   // if (traj_type == "POLY")
   // {
   //     traj = new PolyTrajectory(CALIB_END, POLY_SCALE);
@@ -139,7 +138,7 @@ int main(int argc, char **argv)
   }
   else
   {
-      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/8.0));
+      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_freq));
   }
 
 

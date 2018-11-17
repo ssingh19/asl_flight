@@ -59,7 +59,7 @@ CCMController::CCMController(void):
   _M = _M_nom;
 
   double d_bar = 0.0420;
-  double yaw_bound = 5.0*PI/180.0;
+  double yaw_bound = 10.0*PI/180.0;
   _M_yaw = std::pow((d_bar/yaw_bound),2.0);
   _M_nom(9,9) = _M_yaw;
   _M(9,9) = _M_yaw;
@@ -271,9 +271,8 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     fzCmd = fzCmd + fz_dot*dt;
 
     // Update desired euler_dot_rate
-    euler_dot << _uc_nom(1)+uc_fb(1),_uc_nom(2)+uc_fb(2),_uc_nom(3)+uc_fb(3);
     for (int i = 0; i<3; i++){
-      euler_dot(i) = std::max(std::min(euler_dot(i),1.5),-1.5);
+      euler_dot(i) = std::max(std::min(_uc_nom(i+1)+uc_fb(i+1),1.5),-1.5);
     }
 
   } else {

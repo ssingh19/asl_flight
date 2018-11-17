@@ -1,5 +1,4 @@
 #include <iostream>
-#include <control/se3controller.h>
 #include <control/ccmcontroller.h>
 #include <trajectory/trajectory.h>
 #include <std_msgs/Float64.h>
@@ -15,7 +14,6 @@
 #include <GeoProb/Metric.h>
 
 #define TAKEOFF_TIME 5.0
-#define THROTTLE_SCALE 0.51
 #define TAKEOFF_HGT 1.0
 
 // Measured states
@@ -82,8 +80,8 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
   acc(2) += -9.8066;
   double fz_est_up = -acc.dot(mea_R.col(2));
-  double fz_avg = 0.5*(fz_est+fz_cmd);
-  fz_est =  std::abs((fz_est_up-fz_avg)/fz_avg)>=0.2 ? fz_cmd : fz_est_up;
+  double fz_pred = 0.5*fz_cmd + 0.5*fz_est;
+  fz_est =  std::abs((fz_est_up-fz_pred)/fz_pred)>=0.5 ? fz_pred : fz_est_up;
 
   vel_up = 1;
 
@@ -95,9 +93,9 @@ int main(int argc, char **argv)
   ros::NodeHandle nh;
 
   // Subscriptions
-  ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 1, state_cb);
-  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 1, poseSubCB);
-  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 1, velSubCB);
+  ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 2, state_cb);
+  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 2, poseSubCB);
+  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 2, velSubCB);
 
   pose_up = 0; vel_up = 0;
 
@@ -134,6 +132,9 @@ int main(int argc, char **argv)
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
   Trajectory* traj;
+  double circle_freq;
+  ros::param::get("~CIRCLE_FREQ", circle_freq);
+
   // if (traj_type == "POLY")
   // {
   //     traj = new PolyTrajectory(CALIB_END, POLY_SCALE);
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
   }
   else
   {
-      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/8.0));
+      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_freq));
   }
 
 
@@ -171,6 +172,10 @@ int main(int argc, char **argv)
   Eigen::Vector3d euler;
   Eigen::Vector3d euler_dot;
   vel_prev_t = 0.0;
+
+  double THROTTLE_SCALE;
+  ros::param::get("~TSCALE", THROTTLE_SCALE);
+
 
   while(ros::ok()) {
     // Check for state update
