@@ -132,8 +132,8 @@ int main(int argc, char **argv)
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
   Trajectory* traj;
-  double circle_freq;
-  ros::param::get("~CIRCLE_FREQ", circle_freq);
+  double circle_T;
+  ros::param::get("~CIRCLE_T", circle_T);
 
   // if (traj_type == "POLY")
   // {
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
   }
   else
   {
-      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_freq));
+      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T));
   }
 
 
@@ -166,12 +166,15 @@ int main(int argc, char **argv)
   Eigen::Vector3d r_jer(0, 0, 0);
   Eigen::Vector3d takeoff_loc(0, 0, 0);
 
-  // CCM values
+  // Estimator values
   fz_est = 9.8066;
-  fz_cmd = 9.8066;
   Eigen::Vector3d euler;
-  Eigen::Vector3d euler_dot;
   vel_prev_t = 0.0;
+
+  // Command values
+  Eigen::Vector3d ref_om;
+  fz_cmd = 9.8066;
+
 
   double THROTTLE_SCALE;
   ros::param::get("~TSCALE", THROTTLE_SCALE);
@@ -266,16 +269,16 @@ int main(int argc, char **argv)
     */
 
     fz_cmd = ctrl.getfz();
-    euler_dot = ctrl.getEulerdot();
+    ref_om = ctrl.getOm();
 
     throttle_sp.header.stamp = ros::Time::now();
     throttle_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
     throttlePub.publish(throttle_sp);
 
     omega_sp.header.stamp = ros::Time::now();
-    omega_sp.twist.angular.x = euler_dot(1);
-    omega_sp.twist.angular.y = euler_dot(0);
-    omega_sp.twist.angular.z = -euler_dot(2);
+    omega_sp.twist.angular.x = ref_om(1);
+    omega_sp.twist.angular.y = ref_om(0);
+    omega_sp.twist.angular.z = -ref_om(2);
     omegaPub.publish(omega_sp);
 
     // Publish
@@ -284,11 +287,11 @@ int main(int argc, char **argv)
     debug_msg.data = ctrl.getE();
     debug_pub7.publish(debug_msg);
 
-    debug_msg.data = euler_dot(0);
+    debug_msg.data = ref_om(0);
     debug_pub8.publish(debug_msg);
-    debug_msg.data = euler_dot(1);
+    debug_msg.data = ref_om(1);
     debug_pub9.publish(debug_msg);
-    debug_msg.data = euler_dot(2);
+    debug_msg.data = ref_om(2);
     debug_pub10.publish(debug_msg);
 
     // Reset update
