@@ -106,7 +106,7 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
     mea_pos += 0.5*(v+mea_vel)*dt;
   } else { mea_pos = r;}
   if (vel_up == 0 && active) {
-    Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
+    Eigen::Vector3d accel = -fz*mea_R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
     fz = fzCmd;
@@ -274,7 +274,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     for (int i = 0; i<3; i++){
       euler_dot(i) = std::max(std::min(_uc_nom(i+1)+uc_fb(i+1),1.5),-1.5);
     }
-
+    
   } else {
     uc_fb.setZero();
     euler_dot.setZero();

@@ -16,10 +16,10 @@ offline.init_notebook_mode()
 
 bag = rosbag.Bag('/home/sumeet/catkin_ws/src/asl_flight/scripts/sim.bag')
 
-debug_channels = ['/debug1','/debug2','/debug3','/debug4','/debug5','/debug6']
+# debug_channels = ['/debug1','/debug2','/debug3','/debug4','/debug5','/debug6']
 #debug_channels = ['/debug4','/debug5','/debug6']
 #debug_channels = ['/debug8','/debug9','/debug10']
-#debug_channels = ['/debug7']
+debug_channels = ['/debug7']
 #debug_channels = ['/debug11','/debug12']
 
 
@@ -32,7 +32,7 @@ for topic,msg,t in bag.read_messages(topics=debug_channels):
 
 # XY plot
 layout = go.Layout(height=600,width=600,)
-offline.plot({'data':[ {'x': debug_data['/debug1'], 'y':debug_data['/debug3']},{'x': debug_data['/debug2'], 'y':debug_data['/debug4']}], 'layout': layout})
+# offline.plot({'data':[ {'x': debug_data['/debug1'], 'y':debug_data['/debug3']},{'x': debug_data['/debug2'], 'y':debug_data['/debug4']}], 'layout': layout})
 # plot channels
 offline.plot({'data':[ {'y': debug_data[k]} for k in debug_channels]})
 

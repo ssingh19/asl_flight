@@ -131,21 +131,25 @@ int main(int argc, char **argv)
   // Define trajectory class
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
-  Trajectory* traj;
   double circle_T;
   ros::param::get("~CIRCLE_T", circle_T);
+  double poly_scale;
+  ros::param::get("~POLY_SCALE", poly_scale);
 
-  // if (traj_type == "POLY")
-  // {
-  //     traj = new PolyTrajectory(CALIB_END, POLY_SCALE);
-  // }
-  if (traj_type == "HOVER")
-  {
-      traj = new HoverTrajectory();
-  }
-  else
-  {
-      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T));
+  Trajectory* traj;
+
+  if (traj_type == "HOVER")  {
+
+    traj = new HoverTrajectory();
+
+  } else if (traj_type == "POLY") {
+
+    traj = new PolyTrajectory(2.0,poly_scale);
+
+  }  else  {
+
+    traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T));
+
   }
 
 
