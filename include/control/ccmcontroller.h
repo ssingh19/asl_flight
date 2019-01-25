@@ -28,6 +28,9 @@ private:
   Eigen::Vector3d mea_vel;
   double fz;
 
+  Eigen::Vector3d euler_sum;
+  double euler_N;
+
 
   // CCM specific variables
   Eigen::VectorXd _xc_nom;

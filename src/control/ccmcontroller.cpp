@@ -6,8 +6,8 @@
 
 /********* Constructor ***********/
 CCMController::CCMController(void):
-    active(false),
-    mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
+    active(false), euler_N(1.0),
+    mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066), euler_sum(0.0,0.0,0.0),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_w_nom(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
     fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),
@@ -30,7 +30,7 @@ CCMController::CCMController(void):
     J = Eigen::Matrix3d::Identity(3,3);
 
   } else if(MODEL=="iris") {
-    // Iris in Gazebo (ENU torque command)
+    // Iris in Gazebo (NWU torque command)
     A << 1, 1, 1, 1,
         -0.22, 0.2, 0.22, -0.2,
         -0.13, 0.13, -0.13, 0.13,
@@ -103,14 +103,23 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 
   dt = _dt;
   if (pose_up == 0 && active) {
+
     mea_pos += 0.5*(v+mea_vel)*dt;
+
   } else { mea_pos = r;}
+
   if (vel_up == 0 && active) {
-    Eigen::Vector3d accel = -fz*mea_R.col(2);
+
+    Eigen::Vector3d accel = -_fz*mea_R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
-    fz = fzCmd;
-  } else {mea_vel = v; fz = _fz;}
+    fz = std::abs(_fz - fzCmd) >= 0.1 ? fzCmd : _fz;
+
+  } else {
+
+    mea_vel = v;
+    fz = std::abs(_fz - fzCmd) >= 0.1 ? fzCmd : _fz;
+  }
 
   mea_R = R;
   mea_wb = w;
@@ -119,9 +128,11 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 
 /********* Coordinate conversions ***********/
 void CCMController::R2euler_123(void){
-  euler(1) = std::asin(mea_R(0,2));
-  euler(0) = std::atan2(-mea_R(1,2),mea_R(2,2));
-  euler(2) = std::atan2(-mea_R(0,1),mea_R(0,0));
+  euler_sum(1) = euler_sum(1) + std::asin(mea_R(0,2)) - (euler_sum(1)/euler_N);
+  euler_sum(0) = euler_sum(0) + std::atan2(-mea_R(1,2),mea_R(2,2)) - (euler_sum(0)/euler_N);
+  euler_sum(2) = euler_sum(2) + std::atan2(-mea_R(0,1),mea_R(0,0)) - (euler_sum(2)/euler_N);
+
+  euler = euler_sum/euler_N;
 }
 
 void CCMController::Euler2R_123(const double r, const double p, const double y){
@@ -272,9 +283,9 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
     // Update desired euler_dot_rate
     for (int i = 0; i<3; i++){
-      euler_dot(i) = std::max(std::min(_uc_nom(i+1)+uc_fb(i+1),1.5),-1.5);
+      euler_dot(i) = std::max(std::min(_uc_nom(i+1)+uc_fb(i+1),3.0),-3.0);
     }
-    
+
   } else {
     uc_fb.setZero();
     euler_dot.setZero();

@@ -15,6 +15,7 @@
 
 #define TAKEOFF_TIME 5.0
 #define TAKEOFF_HGT 1.0
+#define FZ_EST_N 5.0
 
 // Measured states
 std::string current_mode;
@@ -24,7 +25,10 @@ Eigen::Vector3d mea_pos;
 Eigen::Vector3d mea_vel;
 Eigen::Vector3d vel_prev;
 double vel_prev_t;
+
+// Thrust estimation MA
 double fz_est;
+double fz_est_sum;
 double fz_cmd;
 
 // Update variables
@@ -80,8 +84,10 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
   acc(2) += -9.8066;
   double fz_est_up = -acc.dot(mea_R.col(2));
-  double fz_pred = 0.5*fz_cmd + 0.5*fz_est;
-  fz_est =  std::abs((fz_est_up-fz_pred)/fz_pred)>=0.5 ? fz_pred : fz_est_up;
+
+  // Moving average update
+  fz_est_sum = fz_est_sum + fz_est_up - (fz_est_sum/FZ_EST_N);
+  fz_est = fz_est_sum/FZ_EST_N;
 
   vel_up = 1;
 
@@ -100,11 +106,25 @@ int main(int argc, char **argv)
   pose_up = 0; vel_up = 0;
 
   // Actuator publisher
-  //ros::Publisher actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
-  ros::Publisher omegaPub = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_attitude/cmd_vel", 2);
-  ros::Publisher throttlePub = nh.advertise<mavros_msgs::Thrust>("mavros/setpoint_attitude/thrust", 2);
+  bool cmd_mot;
+  ros::param::get("~CMD_MOT", cmd_mot);
 
-  //mavros_msgs::ActuatorControl cmd;
+  ros::Publisher actuatorPub;
+  ros::Publisher omegaPub;
+  ros::Publisher throttlePub;
+
+  if (cmd_mot) {
+
+    actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
+
+  } else {
+
+    omegaPub = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_attitude/cmd_vel", 2);
+    throttlePub = nh.advertise<mavros_msgs::Thrust>("mavros/setpoint_attitude/thrust", 2);
+
+  }
+
+  mavros_msgs::ActuatorControl mot_sp;
   geometry_msgs::TwistStamped omega_sp;
   mavros_msgs::Thrust throttle_sp;
 
@@ -172,6 +192,7 @@ int main(int argc, char **argv)
 
   // Estimator values
   fz_est = 9.8066;
+  fz_est_sum = fz_est * FZ_EST_N;
   Eigen::Vector3d euler;
   vel_prev_t = 0.0;
 
@@ -259,31 +280,37 @@ int main(int argc, char **argv)
     }
     // Update controller internal state
     ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
+
+    // Compute feedback
     ctrl.calcCCM(yaw_des, r_pos, r_vel, r_acc, r_jer);
 
     // publish commands
-    /*
-    cmd.header.stamp = ros::Time::now();
-    cmd.group_mix = 0;
-    for(int i=0; i<4; i++) {
-      cmd.controls[i] = ctrl.motorCmd[i];
-    }
-    cmd.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
-    actuatorPub.publish(cmd);
-    */
-
     fz_cmd = ctrl.getfz();
     ref_om = ctrl.getOm();
 
-    throttle_sp.header.stamp = ros::Time::now();
-    throttle_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
-    throttlePub.publish(throttle_sp);
+    if (cmd_mot) {
 
-    omega_sp.header.stamp = ros::Time::now();
-    omega_sp.twist.angular.x = ref_om(1);
-    omega_sp.twist.angular.y = ref_om(0);
-    omega_sp.twist.angular.z = -ref_om(2);
-    omegaPub.publish(omega_sp);
+      mot_sp.header.stamp = ros::Time::now();
+      mot_sp.group_mix = 0;
+      for(int i=0; i<4; i++) {
+        mot_sp.controls[i] = ctrl.motorCmd[i];
+      }
+      mot_sp.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
+      actuatorPub.publish(mot_sp);
+
+    } else {
+
+      throttle_sp.header.stamp = ros::Time::now();
+      throttle_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
+      throttlePub.publish(throttle_sp);
+
+      omega_sp.header.stamp = ros::Time::now();
+      omega_sp.twist.angular.x = ref_om(1);
+      omega_sp.twist.angular.y = ref_om(0);
+      omega_sp.twist.angular.z = -ref_om(2);
+      omegaPub.publish(omega_sp);
+
+    }
 
     // Publish
     euler = ctrl.getEuler();

@@ -23,11 +23,12 @@
 
     <node pkg="asl_flight" type="asl_traj_ctrl" name="asl_traj_ctrl" output="screen" >
       <param name="KW" value="1.2" />
-      <param name="M" value="1.517" />
-      <param name="TRAJ" type="str" value="HOVER" />
+      <param name="M" value="1.51" />
+      <param name="TRAJ" type="str" value="CIRCLE" />
       <param name="CIRCLE_T" value="10.0"/>
       <param name="POLY_SCALE" value="1.0"/>
-      <param name="TCOEFF" value="6.4" />
+      <param name="CMD_MOT" type="bool" value="true" />
+      <param name="TCOEFF" value="6.6" />
       <param name="TSCALE" value="0.56" />
       <param name="MODEL" value="iris"/>
     </node>
