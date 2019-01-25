@@ -6,8 +6,8 @@
 
 /********* Constructor ***********/
 CCMController::CCMController(void):
-    active(false), euler_N(1.0),
-    mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066), euler_sum(0.0,0.0,0.0),
+    active(false),
+    mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_w_nom(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
     fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),
@@ -128,11 +128,9 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 
 /********* Coordinate conversions ***********/
 void CCMController::R2euler_123(void){
-  euler_sum(1) = euler_sum(1) + std::asin(mea_R(0,2)) - (euler_sum(1)/euler_N);
-  euler_sum(0) = euler_sum(0) + std::atan2(-mea_R(1,2),mea_R(2,2)) - (euler_sum(0)/euler_N);
-  euler_sum(2) = euler_sum(2) + std::atan2(-mea_R(0,1),mea_R(0,0)) - (euler_sum(2)/euler_N);
-
-  euler = euler_sum/euler_N;
+  euler(1) = std::asin(mea_R(0,2));
+  euler(0) = std::atan2(-mea_R(1,2),mea_R(2,2));
+  euler(2) = std::atan2(-mea_R(0,1),mea_R(0,0));
 }
 
 void CCMController::Euler2R_123(const double r, const double p, const double y){
