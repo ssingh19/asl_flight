@@ -41,7 +41,7 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg)
 }
 
 void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
-  // By default, MAVROS gives local_position/pose in ENU (x-dir preserved)
+  // By default, MAVROS gives local_position/pose in NWU (x-dir preserved)
   mea_pos(0) = msg->pose.position.x;
   mea_pos(1) = -msg->pose.position.y;
   mea_pos(2) = -msg->pose.position.z;
@@ -65,7 +65,7 @@ void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
 }
 
 void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
-  // By default, MAVROS gives local_position/velocity in ENU
+  // By default, MAVROS gives local_position/velocity in NWU
 
   vel_prev = mea_vel;
 
@@ -197,6 +197,7 @@ int main(int argc, char **argv)
   vel_prev_t = 0.0;
 
   // Command values
+  Eigen::Vector3d ref_er;
   Eigen::Vector3d ref_om;
   fz_cmd = 9.8066;
 
@@ -286,7 +287,12 @@ int main(int argc, char **argv)
 
     // publish commands
     fz_cmd = ctrl.getfz();
+    ref_er = ctrl.getEr();
     ref_om = ctrl.getOm();
+
+    euler = ctrl.getEuler();
+
+    ROS_INFO("(%.4f, %.4f: %.4f, %.4f, %.4f)", euler(1), euler(2), ref_om(0), ref_om(1), ref_om(2));
 
     if (cmd_mot) {
 
@@ -304,17 +310,16 @@ int main(int argc, char **argv)
       throttle_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
       throttlePub.publish(throttle_sp);
 
+      // Publish omega_sp in ENU
       omega_sp.header.stamp = ros::Time::now();
-      omega_sp.twist.angular.x = ref_om(1);
-      omega_sp.twist.angular.y = ref_om(0);
-      omega_sp.twist.angular.z = -ref_om(2);
+      omega_sp.twist.angular.x = ref_er(1);
+      omega_sp.twist.angular.y = ref_er(0);
+      omega_sp.twist.angular.z = -ref_er(2);
       omegaPub.publish(omega_sp);
 
     }
 
     // Publish
-    euler = ctrl.getEuler();
-
     debug_msg.data = ctrl.getE();
     debug_pub7.publish(debug_msg);
 

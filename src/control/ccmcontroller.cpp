@@ -212,6 +212,10 @@ double CCMController::getfz(){
   return fzCmd;
 }
 
+Eigen::Vector3d CCMController::getEr(){
+  return euler_dot;
+}
+
 Eigen::Vector3d CCMController::getOm(){
   return r_wb;
 }

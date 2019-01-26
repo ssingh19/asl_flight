@@ -107,6 +107,7 @@ public:
   // Return functions
   double getE();
   double getfz();
+  Eigen::Vector3d getEr();
   Eigen::Vector3d getOm();
   Eigen::Vector3d getEuler();
 
