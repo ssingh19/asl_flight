@@ -147,7 +147,8 @@ add_executable(asl_traj_ctrl
   src/GeoProb/Geodesic.cpp
   src/trajectory/circle_trajectory.cpp
   src/trajectory/hover_trajectory.cpp
-  src/trajectory/poly_trajectory.cpp)
+  src/trajectory/poly_trajectory.cpp
+  src/utils/utils.cpp)
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
 

@@ -10,6 +10,7 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 
+#include <utils/utils.h>
 #include <GeoProb/Geodesic.h>
 #include <GeoProb/Metric.h>
 
@@ -19,12 +20,17 @@
 
 // Measured states
 std::string current_mode;
+Eigen::Vector4d mea_q;
 Eigen::Matrix3d mea_R;
 Eigen::Vector3d mea_wb;
 Eigen::Vector3d mea_pos;
 Eigen::Vector3d mea_vel;
 Eigen::Vector3d vel_prev;
 double vel_prev_t;
+static Eigen::Matrix<double,3,3> Rz_T =
+(Eigen::Matrix<double,3,3>() << 0.0, 1.0, 0.0,
+                               -1.0, 0.0, 0.0,
+                                0.0, 0.0, 1.0).finished();
 
 // Thrust estimation MA
 double fz_est;
@@ -41,24 +47,40 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg)
 }
 
 void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
-  // By default, MAVROS gives local_position/pose in NWU (x-dir preserved)
-  mea_pos(0) = msg->pose.position.x;
-  mea_pos(1) = -msg->pose.position.y;
+  // By default, MAVROS gives local_position in ENU
+  mea_pos(0) = msg->pose.position.y;
+  mea_pos(1) = msg->pose.position.x;
   mea_pos(2) = -msg->pose.position.z;
 
-  double q1 = msg->pose.orientation.w;
-  double q2 = msg->pose.orientation.x;
-  double q3 = -msg->pose.orientation.y;
-  double q4 = -msg->pose.orientation.z;
-  double q1s = q1*q1;
-  double q2s = q2*q2;
-  double q3s = q3*q3;
-  double q4s = q4*q4;
+  // ROS quaternion
+  mea_q(0) = msg->pose.orientation.w;
+  mea_q(1) = msg->pose.orientation.x;
+  mea_q(2) = msg->pose.orientation.y;
+  mea_q(3) = msg->pose.orientation.z;
 
-  mea_R <<
-    q1s+q2s-q3s-q4s, 2.0*(q2*q3-q1*q4) ,2.0*(q2*q4+q1*q3),
-    2.0*(q2*q3+q1*q4), q1s-q2s+q3s-q4s, 2.0*(q3*q4-q1*q2),
-    2.0*(q2*q4-q1*q3), 2.0*(q3*q4+q1*q2), q1s-q2s-q3s+q4s;
+  // Convert to Matrix
+  utils::quat2rotM(mea_q, mea_R);
+
+  // Adjust by R_z
+  mea_R = mea_R * Rz_T;
+
+  // Extract ENU encoding of PX4 quat
+  utils::rotM2quat(mea_q, mea_R);
+
+  // Convert to NED
+  double q_w = mea_q(0);
+  double q_x = mea_q(2);
+  double q_y = mea_q(1);
+  double q_z = -mea_q(3);
+
+  mea_q << q_w, q_x, q_y, q_z;
+
+
+  // ROS_INFO("pos: (%.4f, %.4f, %.4f), quat: (%.4f, %.4f: %.4f, %.4f)", mea_pos(0), mea_pos(1), mea_pos(2),
+  //                                                                     q_w, q_x,q_y, q_z);
+
+  // Final conversion to rot matrix
+  utils::quat2rotM(mea_q, mea_R);
 
   pose_up = 1;
 
@@ -73,12 +95,15 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
                    vel_prev_t;
   vel_prev_t = msg->header.stamp.sec + msg->header.stamp.nsec*(1.0e-9);
 
-  mea_vel(0) = msg->twist.linear.x;
-  mea_vel(1) = -msg->twist.linear.y;
+  mea_vel(0) = msg->twist.linear.y;
+  mea_vel(1) = msg->twist.linear.x;
   mea_vel(2) = -msg->twist.linear.z;
-  mea_wb(0) = msg->twist.angular.x;
-  mea_wb(1) = -msg->twist.angular.y;
+  mea_wb(0) = msg->twist.angular.y;
+  mea_wb(1) = msg->twist.angular.x;
   mea_wb(2) = -msg->twist.angular.z;
+
+  // ROS_INFO("vel: (%.4f, %.4f, %.4f), omb: (%.4f, %.4f: %.4f)", mea_vel(0), mea_vel(1), mea_vel(2),
+  //                                                               mea_wb(0), mea_wb(1), mea_wb(2));
 
   //update accel estimate
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
@@ -183,7 +208,7 @@ int main(int argc, char **argv)
   double dt = 0.0;
 
   // Reference values
-  double yaw_des = 0.0;
+  double yaw_des = M_PI/2.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);
@@ -195,6 +220,12 @@ int main(int argc, char **argv)
   fz_est_sum = fz_est * FZ_EST_N;
   Eigen::Vector3d euler;
   vel_prev_t = 0.0;
+  mea_q.setZero();
+  mea_R = Eigen::Matrix3d::Identity();
+  mea_wb.setZero();
+  mea_pos.setZero();
+  mea_vel.setZero();
+  vel_prev.setZero();
 
   // Command values
   Eigen::Vector3d ref_er;
@@ -292,7 +323,7 @@ int main(int argc, char **argv)
 
     euler = ctrl.getEuler();
 
-    ROS_INFO("(%.4f, %.4f: %.4f, %.4f, %.4f)", euler(1), euler(2), ref_om(0), ref_om(1), ref_om(2));
+    // ROS_INFO("(%.4f, %.4f, %.4f: %.4f, %.4f, %.4f)", euler(0), euler(1), euler(2), ref_om(0), ref_om(1), ref_om(2));
 
     if (cmd_mot) {
 

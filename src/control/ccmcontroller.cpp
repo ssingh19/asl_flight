@@ -113,12 +113,12 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
     Eigen::Vector3d accel = -_fz*mea_R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
-    fz = std::abs(_fz - fzCmd) >= 0.1 ? fzCmd : _fz;
+    fz = std::abs(_fz - fzCmd) >= 0.5 ? fzCmd : _fz;
 
   } else {
 
     mea_vel = v;
-    fz = std::abs(_fz - fzCmd) >= 0.1 ? fzCmd : _fz;
+    fz = std::abs(_fz - fzCmd) >= 0.5 ? fzCmd : _fz;
   }
 
   mea_R = R;
@@ -180,7 +180,7 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
   _uc_nom(1) = om_1*(cos(yaw_des)/cos(_xc_nom(8)))-
                om_2*(sin(yaw_des)/cos(_xc_nom(8)));
   _uc_nom(2) = sin(yaw_des)*om_1 + cos(yaw_des)*om_2;
-  _uc_nom(3) = 0.0;
+  _uc_nom(3) = 0.0; // force
 
   double om_3 = sin(_xc_nom(7))*_uc_nom(1)+_uc_nom(3);
   r_w_nom << om_1, om_2, om_3;
@@ -234,7 +234,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fz, euler;
+    _xc << mea_pos, mea_vel, fzCmd, euler;
 
     // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
