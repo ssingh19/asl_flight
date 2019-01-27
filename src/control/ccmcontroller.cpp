@@ -110,15 +110,15 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 
   if (vel_up == 0 && active) {
 
-    Eigen::Vector3d accel = -_fz*mea_R.col(2);
+    Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
-    fz = std::abs(_fz - fzCmd) >= 0.5 ? fzCmd : _fz;
+    fz = std::abs(_fz - fzCmd) >= 0.3 ? fzCmd : _fz;
 
   } else {
 
     mea_vel = v;
-    fz = std::abs(_fz - fzCmd) >= 0.5 ? fzCmd : _fz;
+    fz = std::abs(_fz - fzCmd) >= 0.3 ? fzCmd : _fz;
   }
 
   mea_R = R;
