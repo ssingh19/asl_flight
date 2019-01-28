@@ -41,8 +41,8 @@ offline.plot({'data':[ {'y': debug_data[k]} for k in debug_channels]})
 
 # %%
 
-start = 3400
-end = 13200
+start = 3410
+end = 16000
 
 err_x = np.array(debug_data['/debug1'][start:end]) - np.array(debug_data['/debug2'][start:end])
 err_y = np.array(debug_data['/debug3'][start:end]) - np.array(debug_data['/debug4'][start:end])
