@@ -16,7 +16,7 @@
 
 #define TAKEOFF_TIME 5.0
 #define TAKEOFF_HGT 1.0
-#define FZ_EST_N 5.0
+#define FZ_EST_N 10.0
 
 // Measured states
 std::string current_mode;
@@ -33,9 +33,9 @@ static Eigen::Matrix<double,3,3> Rz_T =
                                 0.0, 0.0, 1.0).finished();
 
 // Thrust estimation MA
+double fz_est_raw;
 double fz_est;
 double fz_est_sum;
-double fz_cmd;
 
 // Update variables
 int pose_up;
@@ -110,6 +110,8 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   acc(2) += -9.8066;
   double fz_est_up = -acc.dot(mea_R.col(2));
 
+  fz_est_raw = fz_est_up;
+
   // Moving average update
   fz_est_sum = fz_est_sum + fz_est_up - (fz_est_sum/FZ_EST_N);
   fz_est = fz_est_sum/FZ_EST_N;
@@ -167,6 +169,7 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub10 = nh.advertise<std_msgs::Float64>("/debug10", 1);
   ros::Publisher debug_pub11 = nh.advertise<std_msgs::Float64>("/debug11", 1);
   ros::Publisher debug_pub12 = nh.advertise<std_msgs::Float64>("/debug12", 1);
+  ros::Publisher debug_pub13 = nh.advertise<std_msgs::Float64>("/debug13", 1);
   std_msgs::Float64 debug_msg;
 
   // Define controller classes
@@ -180,6 +183,8 @@ int main(int argc, char **argv)
   ros::param::get("~CIRCLE_T", circle_T);
   double poly_scale;
   ros::param::get("~POLY_SCALE", poly_scale);
+  double start_delay;
+  ros::param::get("~START_DELAY", start_delay);
 
   Trajectory* traj;
 
@@ -189,11 +194,11 @@ int main(int argc, char **argv)
 
   } else if (traj_type == "POLY") {
 
-    traj = new PolyTrajectory(2.0,poly_scale);
+    traj = new PolyTrajectory(start_delay,poly_scale);
 
   }  else  {
 
-    traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T));
+    traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T),start_delay);
 
   }
 
@@ -230,7 +235,7 @@ int main(int argc, char **argv)
   // Command values
   Eigen::Vector3d ref_er;
   Eigen::Vector3d ref_om;
-  fz_cmd = 9.8066;
+  double fz_cmd = 9.8066;
 
 
   double THROTTLE_SCALE;
@@ -264,6 +269,8 @@ int main(int argc, char **argv)
     debug_pub11.publish(debug_msg);
     debug_msg.data = fz_est;
     debug_pub12.publish(debug_msg);
+    debug_msg.data = fz_est_raw;
+    debug_pub13.publish(debug_msg);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;

@@ -10,7 +10,7 @@ CCMController::CCMController(void):
     mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_w_nom(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
-    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),
+    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),fz_dot_sum(0.0),fz_dot_N(5.0),
     MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.25){
 
   // handle ros parameters
@@ -104,21 +104,23 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
   dt = _dt;
   if (pose_up == 0 && active) {
 
-    mea_pos += 0.5*(v+mea_vel)*dt;
+    Eigen::Vector3d accel = -fzCmd*R.col(2);
+    accel(2) += g;
+    mea_pos += v*dt + 0.5*accel*(dt*dt);
 
   } else { mea_pos = r;}
 
   if (vel_up == 0 && active) {
 
-    Eigen::Vector3d accel = -fzCmd*mea_R.col(2);
+    Eigen::Vector3d accel = -_fz*R.col(2);
     accel(2) += g;
     mea_vel += accel*dt;
-    fz = std::abs(_fz - fzCmd) >= 0.3 ? fzCmd : _fz;
+    fz = _fz;
 
   } else {
 
     mea_vel = v;
-    fz = std::abs(_fz - fzCmd) >= 0.3 ? fzCmd : _fz;
+    fz = _fz;
   }
 
   mea_R = R;
@@ -234,7 +236,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fzCmd, euler;
+    _xc << mea_pos, mea_vel, fz, euler;
 
     // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
@@ -278,7 +280,8 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     */
 
     // Update fz_dot
-    fz_dot = _uc_nom(0)+uc_fb(0);
+    fz_dot_sum += _uc_nom(0)+uc_fb(0) - (fz_dot_sum/fz_dot_N);
+    fz_dot = fz_dot_sum/fz_dot_N;
 
     // Update thrust
     fzCmd = fzCmd + fz_dot*dt;

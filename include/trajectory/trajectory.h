@@ -33,9 +33,10 @@ private:
   Eigen::Vector3d start_pos;
   double om;
   double radius;
+  double start_delay;
 
 public:
-  CircleTrajectory(double _radius, double _om);
+  CircleTrajectory(double _radius, double _om, double _start_delay);
   void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
 
   void set_start_pos(const Eigen::Vector3d &_start_pos);
