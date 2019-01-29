@@ -173,21 +173,21 @@ void PolyTrajectory::eval(double t, Eigen::Vector3d &pos,
 		}
 	}
 
-	pos(0) += start_pos(0);
-	pos(1) += start_pos(1);
-	pos(2) += start_pos(2);
+	pos(0) = start_pos(0) + output(0);
+	pos(1) = start_pos(1) + output(1);
+	pos(2) = start_pos(2) + output(2);
 
-	vel(0) *= traj_valid/scale;
-	vel(1) *= traj_valid/scale;
-	vel(2) *= traj_valid/scale;
+	vel(0) = output(3) * traj_valid/scale;
+	vel(1) = output(4) * traj_valid/scale;
+	vel(2) = output(5) * traj_valid/scale;
 
-	acc(0) *= traj_valid/(scale*scale);
-	acc(1) *= traj_valid/(scale*scale);
-	acc(2) *= traj_valid/(scale*scale);
+	acc(0) = output(6) * traj_valid/(scale*scale);
+	acc(1) = output(7) * traj_valid/(scale*scale);
+	acc(2) = output(8) * traj_valid/(scale*scale);
 
-	jer(0) *= traj_valid/(scale*scale*scale);
-	jer(1) *= traj_valid/(scale*scale*scale);
-	jer(2) *= traj_valid/(scale*scale*scale);
+	jer(0) = output(9) * traj_valid/(scale*scale*scale);
+	jer(1) = output(10) * traj_valid/(scale*scale*scale);
+	jer(2) = output(11) * traj_valid/(scale*scale*scale);
 
 }
 
