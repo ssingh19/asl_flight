@@ -16,7 +16,7 @@
 
 #define TAKEOFF_TIME 5.0
 #define TAKEOFF_HGT 1.0
-#define FZ_EST_N 10.0
+#define FZ_EST_N 5.0
 
 // Measured states
 std::string current_mode;
