@@ -55,10 +55,9 @@ private:
   double E;
   Eigen::Vector4d uc_fb;
   double fz_dot_sum;
-  double fz_dot_N;
+  double filter_N;
   double fz_dot; //CCM computed thrust_dot
   Eigen::Vector3d euler_dot;
-  Eigen::Vector3d r_w_nom;
   Eigen::Vector3d r_wb;
   double fzCmd; // Thrust command
   Eigen::Vector3d tauCmd; // Torque command

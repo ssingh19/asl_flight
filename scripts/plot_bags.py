@@ -19,7 +19,7 @@ bag = rosbag.Bag('/home/sumeet/catkin_ws/src/asl_flight/scripts/sim.bag')
 debug_channels = ['/debug1','/debug2','/debug3','/debug4','/debug5','/debug6']
 # debug_channels = ['/debug8','/debug9','/debug10']
 # debug_channels = ['/debug7']
-# debug_channels = ['/debug11','/debug13','/debug12']
+debug_channels = ['/debug11','/debug13','/debug12']
 
 
 debug_data = {}
@@ -30,7 +30,7 @@ for topic,msg,t in bag.read_messages(topics=debug_channels):
     debug_data[topic].append(msg.data)
 
 # XY plot
-# layout = go.Layout(height=600,width=600,)
+layout = go.Layout(height=1200,width=1200,)
 # offline.plot({'data':[ {'x': debug_data['/debug1'], 'y':debug_data['/debug3']},{'x': debug_data['/debug2'], 'y':debug_data['/debug4']}], 'layout': layout})
 # plot channels
 offline.plot({'data':[ {'y': debug_data[k]} for k in debug_channels]})

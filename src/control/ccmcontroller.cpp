@@ -9,8 +9,8 @@ CCMController::CCMController(void):
     active(false),
     mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
-    E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_w_nom(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
-    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),fz_dot_sum(0.0),fz_dot_N(2.0),
+    E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
+    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),fz_dot_sum(0.0),filter_N(2.0),
     MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.28){
 
   // handle ros parameters
@@ -185,8 +185,6 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
   _uc_nom(3) = 0.0; // force
 
   double om_3 = sin(_xc_nom(7))*_uc_nom(1)+_uc_nom(3);
-  r_w_nom << om_1, om_2, om_3;
-
 }
 
 void CCMController::calc_CCM_dyn(const Eigen::VectorXd &xc,const Eigen::Vector4d &uc,
@@ -251,8 +249,13 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_CCM_dyn(_xc, _uc_nom, _xc_dot);
 
     // Now do the computation
+    // X_dot_EndP(6,0) = fzCmd-_xc_nom(6);
+    // X_dot_EndP(6,1) = fzCmd-_xc_nom(6);
     E = 0.5*( X_dot_EndP.col(0).dot(_M_nom*X_dot_EndP.col(0))+
               X_dot_EndP.col(1).dot(_M*X_dot_EndP.col(1)) );
+
+    // X_dot_EndP(6,0) = fz-_xc_nom(6);
+    // X_dot_EndP(6,1) = fz-_xc_nom(6);
 
     double a = 2.0*lambda*E - 2.0*X_dot_EndP.col(0).dot(_M_nom*_xc_nom_dot)+
                               2.0*X_dot_EndP.col(1).dot(_M*_xc_dot);
@@ -280,8 +283,8 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     */
 
     // Update fz_dot
-    fz_dot_sum += _uc_nom(0)+uc_fb(0) - (fz_dot_sum/fz_dot_N);
-    fz_dot = fz_dot_sum/fz_dot_N;
+    fz_dot_sum += _uc_nom(0)+uc_fb(0) - (fz_dot_sum/filter_N);
+    fz_dot = fz_dot_sum/filter_N;
 
     // Update thrust
     fzCmd = fzCmd + fz_dot*dt;
