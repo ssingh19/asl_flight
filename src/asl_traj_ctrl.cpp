@@ -14,8 +14,8 @@
 #include <GeoProb/Geodesic.h>
 #include <GeoProb/Metric.h>
 
-#define TAKEOFF_TIME 5.0
-#define TAKEOFF_HGT 1.0
+#define TAKEOFF_TIME 6.0
+#define TAKEOFF_HGT 1.5
 #define FZ_EST_N 5.0
 
 // Measured states
