@@ -10,8 +10,8 @@ CCMController::CCMController(void):
     mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_w_nom(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
-    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),fz_dot_sum(0.0),fz_dot_N(5.0),
-    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.25){
+    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),fz_dot_sum(0.0),fz_dot_N(2.0),
+    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.28){
 
   // handle ros parameters
   ros::param::get("~KR", KR);
