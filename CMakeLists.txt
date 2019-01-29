@@ -157,9 +157,16 @@ add_executable(se3_traj_ctrl
   src/control/se3controller.cpp
   src/trajectory/circle_trajectory.cpp
   src/trajectory/hover_trajectory.cpp
-  src/trajectory/poly_trajectory.cpp)
+  src/trajectory/poly_trajectory.cpp
+  src/utils/utils.cpp)
 add_dependencies(se3_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(se3_traj_ctrl ${catkin_LIBRARIES})
+
+add_executable(asl_wp_ctrl
+  src/asl_wp_ctrl.cpp
+  src/utils/utils.cpp)
+add_dependencies(asl_wp_ctrl ${PROJECT_NAME}_gencfg)
+target_link_libraries(asl_wp_ctrl ${catkin_LIBRARIES})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

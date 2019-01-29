@@ -9,6 +9,7 @@
 #include <string>
 #include <ros/ros.h>
 #include <ros/console.h>
+#include <utils/utils.h>
 
 #define TAKEOFF_TIME 5.0
 #define THROTTLE_SCALE 0.51
@@ -16,6 +17,7 @@
 
 // Measured states
 std::string current_mode;
+Eigen::Vector4d mea_q;
 Eigen::Matrix3d mea_R;
 Eigen::Vector3d mea_wb;
 Eigen::Vector3d mea_pos;
@@ -24,6 +26,10 @@ Eigen::Vector3d vel_prev;
 double vel_prev_t;
 double fz_est;
 double fz_cmd;
+static Eigen::Matrix<double,3,3> Rz_T =
+(Eigen::Matrix<double,3,3>() << 0.0, 1.0, 0.0,
+                               -1.0, 0.0, 0.0,
+                                0.0, 0.0, 1.0).finished();
 
 // Update variables
 int pose_up;
@@ -40,19 +46,35 @@ void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
   mea_pos(1) = -msg->pose.position.y;
   mea_pos(2) = -msg->pose.position.z;
 
-  double q1 = msg->pose.orientation.w;
-  double q2 = msg->pose.orientation.x;
-  double q3 = -msg->pose.orientation.y;
-  double q4 = -msg->pose.orientation.z;
-  double q1s = q1*q1;
-  double q2s = q2*q2;
-  double q3s = q3*q3;
-  double q4s = q4*q4;
+  // ROS quaternion
+  mea_q(0) = msg->pose.orientation.w;
+  mea_q(1) = msg->pose.orientation.x;
+  mea_q(2) = msg->pose.orientation.y;
+  mea_q(3) = msg->pose.orientation.z;
 
-  mea_R <<
-    q1s+q2s-q3s-q4s, 2.0*(q2*q3-q1*q4) ,2.0*(q2*q4+q1*q3),
-    2.0*(q2*q3+q1*q4), q1s-q2s+q3s-q4s, 2.0*(q3*q4-q1*q2),
-    2.0*(q2*q4-q1*q3), 2.0*(q3*q4+q1*q2), q1s-q2s-q3s+q4s;
+  // Convert to Matrix
+  utils::quat2rotM(mea_q, mea_R);
+
+  // Adjust by R_z
+  mea_R = mea_R * Rz_T;
+
+  // Extract ENU encoding of PX4 quat
+  utils::rotM2quat(mea_q, mea_R);
+
+  // Convert to NED
+  double q_w = mea_q(0);
+  double q_x = mea_q(2);
+  double q_y = mea_q(1);
+  double q_z = -mea_q(3);
+
+  mea_q << q_w, q_x, q_y, q_z;
+
+
+  // ROS_INFO("pos: (%.4f, %.4f, %.4f), quat: (%.4f, %.4f: %.4f, %.4f)", mea_pos(0), mea_pos(1), mea_pos(2),
+  //                                                                     q_w, q_x,q_y, q_z);
+
+  // Final conversion to rot matrix
+  utils::quat2rotM(mea_q, mea_R);
 
   pose_up = 1;
 
@@ -124,21 +146,27 @@ int main(int argc, char **argv)
   // Define trajectory class
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
-  Trajectory* traj;
-  double circle_freq;
-  ros::param::get("~CIRCLE_FREQ", circle_freq);
+  double circle_T;
+  ros::param::get("~CIRCLE_T", circle_T);
+  double poly_scale;
+  ros::param::get("~POLY_SCALE", poly_scale);
+  double start_delay;
+  ros::param::get("~START_DELAY", start_delay);
 
-  // if (traj_type == "POLY")
-  // {
-  //     traj = new PolyTrajectory(CALIB_END, POLY_SCALE);
-  // }
-  if (traj_type == "HOVER")
-  {
-      traj = new HoverTrajectory();
-  }
-  else
-  {
-      traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_freq));
+  Trajectory* traj;
+
+  if (traj_type == "HOVER")  {
+
+    traj = new HoverTrajectory();
+
+  } else if (traj_type == "POLY") {
+
+    traj = new PolyTrajectory(start_delay,poly_scale);
+
+  }  else  {
+
+    traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T),start_delay);
+
   }
 
 

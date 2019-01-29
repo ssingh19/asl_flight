@@ -1,0 +1,54 @@
+<launch>
+	<!-- vim: set ft=xml noet : -->
+	<!-- example launch script for PX4 based FCU's -->
+
+	<!-- mavros launch -->
+	<arg name="fcu_url" default="/dev/ttyUSB0:921600" />
+	<arg name="gcs_url" default="" />
+	<arg name="tgt_system" default="1" />
+	<arg name="tgt_component" default="1" />
+	<arg name="log_output" default="screen" />
+	<arg name="fcu_protocol" default="v2.0" />
+
+	<include file="$(find mavros)/launch/node.launch">
+		<arg name="pluginlists_yaml" value="$(find asl_flight)/launch/px4_pluginlists.yaml" />
+		<arg name="config_yaml" value="$(find asl_flight)/launch/px4_config.yaml" />
+
+		<arg name="fcu_url" value="$(arg fcu_url)" />
+		<arg name="gcs_url" value="$(arg gcs_url)" />
+		<arg name="tgt_system" value="$(arg tgt_system)" />
+		<arg name="tgt_component" value="$(arg tgt_component)" />
+		<arg name="log_output" value="$(arg log_output)" />
+		<arg name="fcu_protocol" value="$(arg fcu_protocol)" />
+	</include>
+
+	<!-- set mocap settings -->
+
+	<param name="/mavros/vision_pose/tf/listen" value="true" type="bool"/>
+	<param name="/mavros/vision_pose/tf/frame_id" value="world" type="str"/>
+	<param name="/mavros/vision_pose/tf/child_frame_id" value="vicon/asl_quad/asl_quad" type="str"/>
+
+	<!-- initialize controller node -->
+
+	<!-- <node pkg="asl_flight" type="asl_traj_ctrl" name="asl_traj_ctrl" output="screen" >
+		<param name="KW" value="1.2" />
+		<param name="M" value="1.51" />
+		<param name="TRAJ" type="str" value="CIRCLE"/>
+		<param name="START_DELAY" value="5.0"/>
+		<param name="CIRCLE_T" value="10.0"/>
+		<param name="POLY_SCALE" value="2.0"/>
+		<param name="CMD_MOT" type="bool" value="false" />
+		<param name="TCOEFF" value="6.6" />
+		<param name="TSCALE" value="0.56" />
+		<param name="MODEL" value="iris"/>
+	</node> -->
+
+	<node pkg="asl_flight" type="asl_wp_ctrl" name="asl_wp_ctrl" output="screen" >
+		<param name="CMD_HOLD" type="bool" value="true" />
+		<param name="REF_X" value="0.0" />
+		<param name="REF_Y" value="0.0" />
+		<param name="REF_Z" value="-1.0"/>
+	</node>
+
+
+</launch>

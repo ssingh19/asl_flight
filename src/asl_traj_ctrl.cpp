@@ -233,8 +233,8 @@ int main(int argc, char **argv)
   vel_prev.setZero();
 
   // Command values
-  Eigen::Vector3d ref_er;
-  Eigen::Vector3d ref_om;
+  Eigen::Vector3d ref_er(0,0,0);
+  Eigen::Vector3d ref_om(0,0,0);
   double fz_cmd = 9.8066;
 
 

@@ -301,15 +301,15 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
   // Convert to desired omega (r_wb)
   R_om(euler,euler_dot);
 
-  Eigen::Vector3d ew = mea_wb-r_wb;
-  tauCmd = -KW*ew; // + mea_wb.cross(J*mea_wb) -J*mea_wb.cross(r_wb);
+  // Eigen::Vector3d ew = mea_wb-r_wb;
+  // tauCmd = -KW*ew; // + mea_wb.cross(J*mea_wb) -J*mea_wb.cross(r_wb);
 
   // Get desired forces
-  Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
-  Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);
+  // Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
+  // Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);
 
   // Mix
-  motor_mix(wrench, ffff);
+  // motor_mix(wrench, ffff);
 }
 
 void CCMController::motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff){
