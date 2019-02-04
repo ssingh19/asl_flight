@@ -2,7 +2,7 @@
 #include <control/ccmcontroller.h>
 #include <trajectory/trajectory.h>
 #include <std_msgs/Float64.h>
-#include "mavros_msgs/Thrust.h"
+#include "mavros_msgs/AttitudeTarget.h"
 #include "mavros_msgs/ActuatorControl.h"
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/Imu.h>
@@ -76,7 +76,7 @@ void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
   mea_q << q_w, q_x, q_y, q_z;
 
 
-  // ROS_INFO("pos: (%.4f, %.4f, %.4f), quat: (%.4f, %.4f: %.4f, %.4f)", mea_pos(0), mea_pos(1), mea_pos(2),
+  // ROS_INFO("pos: (%.4f, %.4f, %.4f), quat: (%.4f, %.4f, %.4f, %.4f)", mea_pos(0), mea_pos(1), mea_pos(2),
   //                                                                     q_w, q_x,q_y, q_z);
 
   // Final conversion to rot matrix
@@ -137,8 +137,7 @@ int main(int argc, char **argv)
   ros::param::get("~CMD_MOT", cmd_mot);
 
   ros::Publisher actuatorPub;
-  ros::Publisher omegaPub;
-  ros::Publisher throttlePub;
+  ros::Publisher cmdPub;
 
   if (cmd_mot) {
 
@@ -146,14 +145,12 @@ int main(int argc, char **argv)
 
   } else {
 
-    omegaPub = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_attitude/cmd_vel", 2);
-    throttlePub = nh.advertise<mavros_msgs::Thrust>("mavros/setpoint_attitude/thrust", 2);
+    cmdPub = nh.advertise<mavros_msgs::AttitudeTarget>("mavros/setpoint_raw/attitude",2);
 
   }
 
   mavros_msgs::ActuatorControl mot_sp;
-  geometry_msgs::TwistStamped omega_sp;
-  mavros_msgs::Thrust throttle_sp;
+  mavros_msgs::AttitudeTarget att_sp;
 
 
   // DEBUG PUBLICATIONS
@@ -331,6 +328,7 @@ int main(int argc, char **argv)
     euler = ctrl.getEuler();
 
     // ROS_INFO("(%.4f, %.4f, %.4f: %.4f, %.4f, %.4f)", euler(0), euler(1), euler(2), ref_om(0), ref_om(1), ref_om(2));
+    // ROS_INFO("ref_er: (%.4f, %.4f, %.4f)", ref_er(0), ref_er(1), ref_er(2));
 
     if (cmd_mot) {
 
@@ -344,16 +342,13 @@ int main(int argc, char **argv)
 
     } else {
 
-      throttle_sp.header.stamp = ros::Time::now();
-      throttle_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
-      throttlePub.publish(throttle_sp);
-
-      // Publish omega_sp in ENU
-      omega_sp.header.stamp = ros::Time::now();
-      omega_sp.twist.angular.x = ref_er(1);
-      omega_sp.twist.angular.y = ref_er(0);
-      omega_sp.twist.angular.z = -ref_er(2);
-      omegaPub.publish(omega_sp);
+      att_sp.header.stamp = ros::Time::now();
+      att_sp.type_mask = mavros_msgs::AttitudeTarget::IGNORE_ATTITUDE;
+      att_sp.body_rate.x = ref_er(0);
+      att_sp.body_rate.y = ref_er(1);
+      att_sp.body_rate.z = ref_er(2);
+      att_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
+      cmdPub.publish(att_sp);
 
     }
 

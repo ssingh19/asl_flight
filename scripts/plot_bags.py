@@ -16,10 +16,10 @@ offline.init_notebook_mode()
 
 bag = rosbag.Bag('/home/sumeet/catkin_ws/src/asl_flight/scripts/sim.bag')
 
-debug_channels = ['/debug1','/debug2','/debug3','/debug4','/debug5','/debug6']
+# debug_channels = ['/debug1','/debug2','/debug3','/debug4','/debug5','/debug6']
 # debug_channels = ['/debug8','/debug9','/debug10']
 # debug_channels = ['/debug7']
-# debug_channels = ['/debug11','/debug13','/debug12']
+debug_channels = ['/debug11','/debug13','/debug12']
 
 
 debug_data = {}
