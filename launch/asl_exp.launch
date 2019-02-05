@@ -3,7 +3,7 @@
 	<!-- example launch script for PX4 based FCU's -->
 
 	<!-- mavros launch -->
-	<arg name="fcu_url" default="/dev/ttyUSB0:921600" />
+	<arg name="fcu_url" default="/dev/ttyPixhawk:921600" />
 	<arg name="gcs_url" default="" />
 	<arg name="tgt_system" default="1" />
 	<arg name="tgt_component" default="1" />
@@ -24,9 +24,14 @@
 
 	<!-- set mocap settings -->
 
+	<param name="/mavros/mocap/use_tf" value="true" type="bool"/>
+	<param name="/mavros/mocap/use_pose" value="false" type="bool"/>
+
 	<param name="/mavros/vision_pose/tf/listen" value="true" type="bool"/>
 	<param name="/mavros/vision_pose/tf/frame_id" value="world" type="str"/>
 	<param name="/mavros/vision_pose/tf/child_frame_id" value="vicon/asl_quad/asl_quad" type="str"/>
+
+	<remap to="/vicon/asl_quad/asl_quad" from="/mavros/vision_pose/pose"/>
 
 	<!-- initialize controller node -->
 

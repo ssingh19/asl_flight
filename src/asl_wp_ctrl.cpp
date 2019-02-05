@@ -139,20 +139,17 @@ int main(int argc, char **argv)
   ros::param::get("~REF_Z", ref_z);
 
   // DEBUG PUBLICATIONS
-  // ros::Publisher debug_pub1 = nh.advertise<std_msgs::Float64>("/debug1", 1);
-  // ros::Publisher debug_pub2 = nh.advertise<std_msgs::Float64>("/debug2", 1);
-  // ros::Publisher debug_pub3 = nh.advertise<std_msgs::Float64>("/debug3", 1);
-  // ros::Publisher debug_pub4 = nh.advertise<std_msgs::Float64>("/debug4", 1);
-  // ros::Publisher debug_pub5 = nh.advertise<std_msgs::Float64>("/debug5", 1);
-  // ros::Publisher debug_pub6 = nh.advertise<std_msgs::Float64>("/debug6", 1);
-  // ros::Publisher debug_pub7 = nh.advertise<std_msgs::Float64>("/debug7", 1);
-  // ros::Publisher debug_pub8 = nh.advertise<std_msgs::Float64>("/debug8", 1);
-  // ros::Publisher debug_pub9 = nh.advertise<std_msgs::Float64>("/debug9", 1);
-  // ros::Publisher debug_pub10 = nh.advertise<std_msgs::Float64>("/debug10", 1);
-  // ros::Publisher debug_pub11 = nh.advertise<std_msgs::Float64>("/debug11", 1);
-  // ros::Publisher debug_pub12 = nh.advertise<std_msgs::Float64>("/debug12", 1);
-  // ros::Publisher debug_pub13 = nh.advertise<std_msgs::Float64>("/debug13", 1);
-  // std_msgs::Float64 debug_msg;
+  ros::Publisher debug_pub1 = nh.advertise<std_msgs::Float64>("/debug1", 1);
+  ros::Publisher debug_pub2 = nh.advertise<std_msgs::Float64>("/debug2", 1);
+  ros::Publisher debug_pub3 = nh.advertise<std_msgs::Float64>("/debug3", 1);
+  ros::Publisher debug_pub4 = nh.advertise<std_msgs::Float64>("/debug4", 1);
+  ros::Publisher debug_pub5 = nh.advertise<std_msgs::Float64>("/debug5", 1);
+  ros::Publisher debug_pub6 = nh.advertise<std_msgs::Float64>("/debug6", 1);
+  ros::Publisher debug_pub7 = nh.advertise<std_msgs::Float64>("/debug7", 1);
+  ros::Publisher debug_pub8 = nh.advertise<std_msgs::Float64>("/debug8", 1);
+  ros::Publisher debug_pub9 = nh.advertise<std_msgs::Float64>("/debug9", 1);
+  ros::Publisher debug_pub10 = nh.advertise<std_msgs::Float64>("/debug10", 1);
+  std_msgs::Float64 debug_msg;
 
   // Controller frequency
   ros::Rate rate(250.0);
@@ -180,6 +177,29 @@ int main(int argc, char **argv)
   while(ros::ok()) {
     // Check for state update
     ros::spinOnce();
+
+    debug_msg.data = mea_pos(0);
+    debug_pub1.publish(debug_msg);
+    debug_msg.data = mea_pos(1);
+    debug_pub2.publish(debug_msg);
+    debug_msg.data = mea_pos(2);
+    debug_pub3.publish(debug_msg);
+
+    debug_msg.data = mea_vel(0);
+    debug_pub4.publish(debug_msg);
+    debug_msg.data = mea_vel(1);
+    debug_pub5.publish(debug_msg);
+    debug_msg.data = mea_vel(2);
+    debug_pub6.publish(debug_msg);
+
+    debug_msg.data = mea_q(0);
+    debug_pub7.publish(debug_msg);
+    debug_msg.data = mea_q(1);
+    debug_pub8.publish(debug_msg);
+    debug_msg.data = mea_q(2);
+    debug_pub9.publish(debug_msg);
+    debug_msg.data = mea_q(3);
+    debug_pub10.publish(debug_msg);
 
     if (current_mode == "OFFBOARD") {
 

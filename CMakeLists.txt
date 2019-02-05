@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   mavros
   mavros_msgs
+  tf
 #  ifopt
 )
 
@@ -167,6 +168,11 @@ add_executable(asl_wp_ctrl
   src/utils/utils.cpp)
 add_dependencies(asl_wp_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_wp_ctrl ${catkin_LIBRARIES})
+
+add_executable(tf2pose
+  src/tf2pose.cpp)
+add_dependencies(tf2pose ${PROJECT_NAME}_gencfg)
+target_link_libraries(tf2pose ${catkin_LIBRARIES})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
