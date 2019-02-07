@@ -184,7 +184,7 @@ fake_gps:
 mocap:
   # select mocap source
   use_tf: false   # ~mocap/tf
-  use_pose: true  # ~mocap/pose
+  use_pose: false  # ~mocap/pose
 
 # odom
 odometry:
