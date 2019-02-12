@@ -5,44 +5,13 @@
 
 
 /********* Constructor ***********/
-CCMController::CCMController(void):
+CCMController::CCMController(const double N):
     active(false),
     mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
     _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
-    fzCmd(9.8066),tauCmd(0.0,0.0,0.0),dt(1.0),fz_dot_sum(0.0),filter_N(2.0),
-    MODEL("aslquad"),  mass(1.04), g(9.8066), TCOEFF(4.4), KW(0.05),lambda(1.28){
-
-  // handle ros parameters
-  ros::param::get("~KR", KR);
-  ros::param::get("~KW", KW);
-  ros::param::get("~M", mass);
-  ros::param::get("~TCOEFF", TCOEFF);
-  ros::param::get("~MODEL", MODEL);
-
-  // A and J
-  if(MODEL=="aslquad") {
-    A << 1, 1, 1, 1,
-        -0.12, 0.12, 0.12, -0.12,
-        -0.12, 0.12, -0.12, 0.12,
-        -0.06, -0.06, 0.06, 0.06;
-
-    J = Eigen::Matrix3d::Identity(3,3);
-
-  } else if(MODEL=="iris") {
-    // Iris in Gazebo (NWU torque command)
-    A << 1, 1, 1, 1,
-        -0.22, 0.2, 0.22, -0.2,
-        -0.13, 0.13, -0.13, 0.13,
-        -0.06, -0.06, 0.06, 0.06;
-
-   J << 0.0347563, 0.0, 0.0,
-        0.0, 0.0458929, 0.0,
-        0.0, 0.0, 0.0977;
-
-  } else {
-    ROS_ERROR("Unknown model name!");
-  }
+    fzCmd(9.8066),dt(1.0),fz_dot_sum(0.0),filter_N(N),
+    g(9.8066), lambda(1.28){
 
   // Measured quantity
   mea_R = Eigen::Matrix3d::Identity();
@@ -76,12 +45,7 @@ CCMController::CCMController(void):
   setMode(false);
 
   // Readout
-  std::cout << "CCM Using the following parameters: " << std::endl;
-  std::cout << "KW = " << KW << std::endl;
-  std::cout << "M = " << mass << std::endl;
-  std::cout << "TCOEFF = " << TCOEFF << std::endl;
-  std::cout << "MODEL: " << MODEL << std::endl;
-
+  std::cout << "CCM initialized " << std::endl;
 }
 
 void CCMController::setMode(const bool _m){
@@ -92,7 +56,6 @@ void CCMController::setMode(const bool _m){
     fz_dot = 0.0;
     uc_fb.setZero();
     euler_dot.setZero();
-    tauCmd.setZero();
   }
 }
 
@@ -234,7 +197,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
 
     // Now compute actual xc
-    _xc << mea_pos, mea_vel, fz, euler;
+    _xc << mea_pos, mea_vel, fzCmd, euler;
 
     // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
@@ -249,13 +212,8 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
     calc_CCM_dyn(_xc, _uc_nom, _xc_dot);
 
     // Now do the computation
-    // X_dot_EndP(6,0) = fzCmd-_xc_nom(6);
-    // X_dot_EndP(6,1) = fzCmd-_xc_nom(6);
     E = 0.5*( X_dot_EndP.col(0).dot(_M_nom*X_dot_EndP.col(0))+
               X_dot_EndP.col(1).dot(_M*X_dot_EndP.col(1)) );
-
-    // X_dot_EndP(6,0) = fz-_xc_nom(6);
-    // X_dot_EndP(6,1) = fz-_xc_nom(6);
 
     double a = 2.0*lambda*E - 2.0*X_dot_EndP.col(0).dot(_M_nom*_xc_nom_dot)+
                               2.0*X_dot_EndP.col(1).dot(_M*_xc_dot);
@@ -303,75 +261,5 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
   // Convert to desired omega (r_wb)
   R_om(euler,euler_dot);
-
-  // Eigen::Vector3d ew = mea_wb-r_wb;
-  // tauCmd = -KW*ew; // + mea_wb.cross(J*mea_wb) -J*mea_wb.cross(r_wb);
-
-  // Get desired forces
-  // Eigen::Vector4d wrench(fzCmd*mass, tauCmd(0), -tauCmd(1), -tauCmd(2));
-  // Eigen::Vector4d ffff = A.colPivHouseholderQr().solve(wrench);
-
-  // Mix
-  // motor_mix(wrench, ffff);
-}
-
-void CCMController::motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff){
-  // Find worst violator
-  bool sat = false;
-  double worst_viol = 0.0;
-  int worst_f = 0;
-  double f_min = 0.1*mass*g/4.0;
-  for (int i = 0; i<4; i++){
-    if (ffff(i) < f_min || ffff(i) > TCOEFF) {
-      sat = true;
-      double low_pen = std::abs(std::min(ffff(i)-f_min,0.0));
-      double high_pen = std::abs(std::max(ffff(i)-TCOEFF,0.0));
-      if ( low_pen > worst_viol || high_pen > worst_viol ) {
-        worst_viol = std::max(low_pen,high_pen);
-        worst_f = i;
-      }
-    }
-  }
-  // Tune down tau_z, while maintaining thrust and tau_xy
-  if (sat){
-    ffff(worst_f) = ffff(worst_f) < f_min ? f_min : TCOEFF;
-    Eigen::Matrix4d A_up = A;
-    int i_up = 0;
-    for (int i=0; i<4; i++){
-      if (i!=worst_f){
-        A_up.col(i_up) = A.col(i);
-        i_up += 1;
-      }
-    }
-    A_up.col(3) = Eigen::Vector4d(0.0,0.0,0.0,1.0);
-    wrench(3) = 0.0;
-    Eigen::Vector4d ffff_up = A_up.colPivHouseholderQr().solve(wrench-ffff(worst_f)*A.col(worst_f));
-    i_up = 0;
-    for (int i=0; i<4; i++){
-      if (i!=worst_f){
-        ffff(i) = ffff_up(i_up);
-        i_up += 1;
-      }
-    }
-  }
-
-  const double c_a =  4.67636;
-  const double c_b =  1.68915;
-  const double c_c = -0.05628;
-
-  for(int i=0; i<4; i++) {
-      //motorCmd[i]  = (-c_b + sqrt( (c_b*c_b) - (4*c_a*(c_c - ffff(i))) ) )/(2*c_a);
-      motorCmd[i] = ffff(i)/TCOEFF;
-
-      if (motorCmd[i] < 0) {
-      motorCmd[i] = 0;
-      }
-      else if (motorCmd[i] > 1.0) {
-      motorCmd[i] = 1.0;
-      }
-      else {
-      // Carry On
-      }
-  }
 
 }

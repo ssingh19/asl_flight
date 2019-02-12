@@ -60,16 +60,11 @@ private:
   Eigen::Vector3d euler_dot;
   Eigen::Vector3d r_wb;
   double fzCmd; // Thrust command
-  Eigen::Vector3d tauCmd; // Torque command
 
   // constants
-  double KR,KW;
-  double mass;
   double g;
-  double TCOEFF;
   double lambda;
   Eigen::MatrixXd _B_ctrl;
-  std::string MODEL;
 
   // CCM controller funcs
   void calc_CCM_dyn(const Eigen::VectorXd &xc,const Eigen::Vector4d &uc,
@@ -80,17 +75,13 @@ private:
                       const Eigen::Vector3d &r_jer,
                       const double yaw_des); // compute xc, uc nom
 
-  // Motor mixing
-  void motor_mix(Eigen::Vector4d &wrench, Eigen::Vector4d &ffff);
-
   // Coordinate conversions
   void R2euler_123(void);
   void Euler2R_123(const double r, const double p, const double y);
   void R_om(const Eigen::Vector3d &q, const Eigen::Vector3d &q_dot);
 
 public:
-  double motorCmd[4];
-  CCMController(void);
+  CCMController(const double N);
 
   // copy in updated state into controller class
   void updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d &R,

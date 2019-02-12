@@ -3,7 +3,6 @@
 #include <trajectory/trajectory.h>
 #include <std_msgs/Float64.h>
 #include "mavros_msgs/AttitudeTarget.h"
-#include "mavros_msgs/ActuatorControl.h"
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/Imu.h>
 #include <string>
@@ -13,10 +12,6 @@
 #include <utils/utils.h>
 #include <GeoProb/Geodesic.h>
 #include <GeoProb/Metric.h>
-
-#define TAKEOFF_TIME 6.0
-#define TAKEOFF_HGT 1.5
-#define FZ_EST_N 5.0
 
 // Measured states
 std::string current_mode;
@@ -33,6 +28,7 @@ static Eigen::Matrix<double,3,3> Rz_T =
                                 0.0, 0.0, 1.0).finished();
 
 // Thrust estimation MA
+double FZ_EST_N;
 double fz_est_raw;
 double fz_est;
 double fz_est_sum;
@@ -108,12 +104,10 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   //update accel estimate
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
   acc(2) += -9.8066;
-  double fz_est_up = -acc.dot(mea_R.col(2));
-
-  fz_est_raw = fz_est_up;
+  fz_est_raw = -acc.dot(mea_R.col(2));
 
   // Moving average update
-  fz_est_sum = fz_est_sum + fz_est_up - (fz_est_sum/FZ_EST_N);
+  fz_est_sum = fz_est_sum + fz_est_raw - (fz_est_sum/FZ_EST_N);
   fz_est = fz_est_sum/FZ_EST_N;
 
   vel_up = 1;
@@ -126,30 +120,14 @@ int main(int argc, char **argv)
   ros::NodeHandle nh;
 
   // Subscriptions
-  ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 2, state_cb);
+  ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 1, state_cb);
   ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 2, poseSubCB);
   ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 2, velSubCB);
 
   pose_up = 0; vel_up = 0;
 
   // Actuator publisher
-  bool cmd_mot;
-  ros::param::get("~CMD_MOT", cmd_mot);
-
-  ros::Publisher actuatorPub;
-  ros::Publisher cmdPub;
-
-  if (cmd_mot) {
-
-    actuatorPub = nh.advertise<mavros_msgs::ActuatorControl>("mavros/actuator_control", 1);
-
-  } else {
-
-    cmdPub = nh.advertise<mavros_msgs::AttitudeTarget>("mavros/setpoint_raw/attitude",2);
-
-  }
-
-  mavros_msgs::ActuatorControl mot_sp;
+  ros::Publisher cmdPub = nh.advertise<mavros_msgs::AttitudeTarget>("mavros/setpoint_raw/attitude",2);
   mavros_msgs::AttitudeTarget att_sp;
 
 
@@ -167,19 +145,20 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub11 = nh.advertise<std_msgs::Float64>("/debug11", 1);
   ros::Publisher debug_pub12 = nh.advertise<std_msgs::Float64>("/debug12", 1);
   ros::Publisher debug_pub13 = nh.advertise<std_msgs::Float64>("/debug13", 1);
+  ros::Publisher debug_pub14 = nh.advertise<std_msgs::Float64>("/debug14", 1);
+  ros::Publisher debug_pub15 = nh.advertise<std_msgs::Float64>("/debug15", 1);
   std_msgs::Float64 debug_msg;
 
   // Define controller classes
-  CCMController ctrl;
+  ros::param::get("~FZ_EST_N", FZ_EST_N);
+  CCMController ctrl(FZ_EST_N/2.0);
 
 
   // Define trajectory class
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
   double circle_T;
-  ros::param::get("~CIRCLE_T", circle_T);
   double poly_scale;
-  ros::param::get("~POLY_SCALE", poly_scale);
   double start_delay;
   ros::param::get("~START_DELAY", start_delay);
 
@@ -191,14 +170,25 @@ int main(int argc, char **argv)
 
   } else if (traj_type == "POLY") {
 
+    ros::param::get("~POLY_SCALE", poly_scale);
     traj = new PolyTrajectory(start_delay,poly_scale);
 
   }  else  {
 
+    ros::param::get("~CIRCLE_T", circle_T);
     traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T),start_delay);
 
   }
 
+  // Takeoff params
+  double TAKEOFF_HGT;
+  ros::param::get("~TAKEOFF_HGT", TAKEOFF_HGT);
+
+  double TAKEOFF_TIME;
+  ros::param::get("~TAKEOFF_TIME", TAKEOFF_TIME);
+
+  bool DO_TAKEOFF;
+  ros::param::get("~DO_TAKEOFF", DO_TAKEOFF);
 
   // Controller frequency
   ros::Rate rate(250.0);
@@ -210,7 +200,7 @@ int main(int argc, char **argv)
   double dt = 0.0;
 
   // Reference values
-  double yaw_des = M_PI/2.0;
+  double yaw_des = 0.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);
@@ -234,10 +224,7 @@ int main(int argc, char **argv)
   Eigen::Vector3d ref_om(0,0,0);
   double fz_cmd = 9.8066;
 
-
-  double THROTTLE_SCALE;
-  ros::param::get("~TSCALE", THROTTLE_SCALE);
-
+  double loop_dt = 0.0;
 
   while(ros::ok()) {
     // Check for state update
@@ -263,11 +250,9 @@ int main(int argc, char **argv)
     fz_cmd = ctrl.getfz();
 
     debug_msg.data = fz_cmd;
-    debug_pub11.publish(debug_msg);
+    debug_pub14.publish(debug_msg);
     debug_msg.data = fz_est;
-    debug_pub12.publish(debug_msg);
-    debug_msg.data = fz_est_raw;
-    debug_pub13.publish(debug_msg);
+    debug_pub15.publish(debug_msg);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;
@@ -287,13 +272,22 @@ int main(int argc, char **argv)
 
           // set takeoff location
           takeoff_loc << mea_pos(0), mea_pos(1), mea_pos(2);
+          ROS_INFO("takeoff loc: (%.3f,%.3f,%.3f)",mea_pos(0),mea_pos(1),mea_pos(2));
 
-          // initialize ref pos and ref vel
+          // initialize ref pos
           r_pos = takeoff_loc;
-          r_vel << 0.0, 0.0, -(TAKEOFF_HGT/TAKEOFF_TIME);
 
-          // set start point for trajectory (hover point above takeoff)
-          traj->set_start_pos(takeoff_loc + Eigen::Vector3d(0.0,0.0,-TAKEOFF_HGT));
+          // Give initial ref vel only if doing takeoff
+          if (DO_TAKEOFF) {  r_vel << 0.0, 0.0, -(TAKEOFF_HGT/TAKEOFF_TIME);}
+
+          // set start point for trajectory
+          if (DO_TAKEOFF) {
+            // if doing takeoff, start point is hover point above takeoff
+            traj->set_start_pos(takeoff_loc + Eigen::Vector3d(0.0,0.0,-TAKEOFF_HGT));
+          } else {
+            // else start point is offboard init location
+            traj->set_start_pos(takeoff_loc);
+          }
       } else {
           time_traj += dt;
       }
@@ -311,8 +305,10 @@ int main(int argc, char **argv)
       ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
       traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer);
     } else {
-      // smooth takeoff
-      r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
+      if (DO_TAKEOFF) {
+        // smooth takeoff
+        r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
+      }
     }
     // Update controller internal state
     ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
@@ -330,38 +326,31 @@ int main(int argc, char **argv)
     // ROS_INFO("(%.4f, %.4f, %.4f: %.4f, %.4f, %.4f)", euler(0), euler(1), euler(2), ref_om(0), ref_om(1), ref_om(2));
     // ROS_INFO("ref_er: (%.4f, %.4f, %.4f)", ref_er(0), ref_er(1), ref_er(2));
 
-    if (cmd_mot) {
-
-      mot_sp.header.stamp = ros::Time::now();
-      mot_sp.group_mix = 0;
-      for(int i=0; i<4; i++) {
-        mot_sp.controls[i] = ctrl.motorCmd[i];
-      }
-      mot_sp.controls[7] = 0.1234; // secret key to enabling direct motor control in px4
-      actuatorPub.publish(mot_sp);
-
-    } else {
-
-      att_sp.header.stamp = ros::Time::now();
-      att_sp.type_mask = mavros_msgs::AttitudeTarget::IGNORE_ATTITUDE;
-      att_sp.body_rate.x = ref_er(0);
-      att_sp.body_rate.y = ref_er(1);
-      att_sp.body_rate.z = ref_er(2);
-      att_sp.thrust = std::min(1.0, std::max(0.0, THROTTLE_SCALE * (fz_cmd) / 9.8066));
-      cmdPub.publish(att_sp);
-
-    }
+    att_sp.header.stamp = ros::Time::now();
+    att_sp.type_mask = mavros_msgs::AttitudeTarget::IGNORE_ATTITUDE;
+    att_sp.body_rate.x = ref_er(0);
+    att_sp.body_rate.y = ref_er(1);
+    att_sp.body_rate.z = ref_er(2);
+    att_sp.thrust = std::min(1.0, std::max(0.0, 0.56 * (fz_cmd) / 9.8066));
+    cmdPub.publish(att_sp);
 
     // Publish
-    debug_msg.data = ctrl.getE();
+    debug_msg.data = euler(0);
     debug_pub7.publish(debug_msg);
+    debug_msg.data = euler(1);
+    debug_pub8.publish(debug_msg);
+    debug_msg.data = euler(2);
+    debug_pub9.publish(debug_msg);
 
     debug_msg.data = ref_om(0);
-    debug_pub8.publish(debug_msg);
-    debug_msg.data = ref_om(1);
-    debug_pub9.publish(debug_msg);
-    debug_msg.data = ref_om(2);
     debug_pub10.publish(debug_msg);
+    debug_msg.data = ref_om(1);
+    debug_pub11.publish(debug_msg);
+    debug_msg.data = ref_om(2);
+    debug_pub12.publish(debug_msg);
+
+    debug_msg.data = ctrl.getE();
+    debug_pub13.publish(debug_msg);
 
     // Reset update
     pose_up = 0; vel_up = 0;

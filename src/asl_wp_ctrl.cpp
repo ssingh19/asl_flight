@@ -149,6 +149,7 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub8 = nh.advertise<std_msgs::Float64>("/debug8", 1);
   ros::Publisher debug_pub9 = nh.advertise<std_msgs::Float64>("/debug9", 1);
   ros::Publisher debug_pub10 = nh.advertise<std_msgs::Float64>("/debug10", 1);
+  ros::Publisher debug_pub11 = nh.advertise<std_msgs::Float64>("/debug11", 1);
   std_msgs::Float64 debug_msg;
 
   // Controller frequency
@@ -200,6 +201,9 @@ int main(int argc, char **argv)
     debug_pub9.publish(debug_msg);
     debug_msg.data = mea_q(3);
     debug_pub10.publish(debug_msg);
+
+    debug_msg.data = fz_est;
+    debug_pub11.publish(debug_msg);
 
     if (current_mode == "OFFBOARD") {
 
