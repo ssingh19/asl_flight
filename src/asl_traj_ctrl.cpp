@@ -121,8 +121,8 @@ int main(int argc, char **argv)
 
   // Subscriptions
   ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 1, state_cb);
-  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 1, poseSubCB);
-  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 1, velSubCB);
+  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 2, poseSubCB);
+  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 2, velSubCB);
 
   pose_up = 0; vel_up = 0;
 
@@ -151,7 +151,9 @@ int main(int argc, char **argv)
 
   // Define controller classes
   ros::param::get("~FZ_EST_N", FZ_EST_N);
-  CCMController ctrl(1.0);
+  double FZ_CTRL_N = 1.0;
+  ros::param::get("~FZ_CTRL_N", FZ_CTRL_N);
+  CCMController ctrl(FZ_CTRL_N);
 
 
   // Define trajectory class
@@ -164,19 +166,23 @@ int main(int argc, char **argv)
 
   Trajectory* traj;
 
-  if (traj_type == "HOVER")  {
+  if (traj_type == "CIRCLE") {
 
-    traj = new HoverTrajectory();
+    ros::param::get("~CIRCLE_T", circle_T);
+    traj = new CircleTrajectory(1.0, 2.0*M_PI*(1.0/circle_T),start_delay);
 
   } else if (traj_type == "POLY") {
 
     ros::param::get("~POLY_SCALE", poly_scale);
-    traj = new PolyTrajectory(start_delay,poly_scale);
+    traj = new PolyTrajectory(poly_scale, start_delay);
 
-  }  else  {
+  } else if (traj_type == "FIG8") {
 
-    ros::param::get("~CIRCLE_T", circle_T);
-    traj = new CircleTrajectory(1.0, 2.0*3.14*(1.0/circle_T),start_delay);
+    traj = new Fig8Trajectory(2.0, 1.0, 2.0*M_PI*(1.0/circle_T), start_delay);
+
+  } else  {
+
+    traj = new HoverTrajectory();
 
   }
 
@@ -200,7 +206,7 @@ int main(int argc, char **argv)
   double dt = 0.0;
 
   // Reference values
-  double yaw_des = M_PI/2.0;
+  double yaw_des = 0.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);

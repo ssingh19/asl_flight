@@ -3,7 +3,7 @@
 #include <ros/ros.h>
 
 
-PolyTrajectory::PolyTrajectory(double _start_delay, double _scale):
+PolyTrajectory::PolyTrajectory(double _scale, double _start_delay):
 	switch_time(5),
 	start_delay(_start_delay),
 	scale(_scale)

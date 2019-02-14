@@ -43,6 +43,22 @@ public:
 
 };
 
+class Fig8Trajectory: public Trajectory {
+private:
+  Eigen::Vector3d start_pos;
+  double om;
+  double radius_x;
+  double radius_y;
+  double start_delay;
+
+public:
+  Fig8Trajectory(double _radius_x, double _radius_y, double _om, double _start_delay);
+  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
+
+  void set_start_pos(const Eigen::Vector3d &_start_pos);
+
+};
+
 
 class PolyTrajectory: public Trajectory {
 private:
@@ -55,7 +71,7 @@ private:
   Eigen::MatrixXd expand_coeffs(Eigen::MatrixXd& _coeffs);
 
 public:
-  PolyTrajectory(double _start_delay, double _scale);
+  PolyTrajectory(double _scale, double _start_delay);
   void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
 
   void set_start_pos(const Eigen::Vector3d &_start_pos);

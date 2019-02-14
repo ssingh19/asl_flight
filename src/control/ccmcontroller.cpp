@@ -66,30 +66,31 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 
   dt = _dt;
 
-    // First update state for current time-step
-  if (pose_up) {
-    mea_pos = r;
-    mea_R = R;
-  }
+  if (pose_up == 0 && active) {
 
+  Eigen::Vector3d accel = -fzCmd*R.col(2);
+  accel(2) += g;
+  mea_pos += v*dt + 0.5*accel*(dt*dt);
+
+} else { mea_pos = r;}
+
+if (vel_up == 0 && active) {
+
+  Eigen::Vector3d accel = -fzCmd*R.col(2);
+  accel(2) += g;
+  mea_vel += accel*dt;
   fz = fzCmd;
 
-  if (vel_up) {
-    mea_vel = v;
-    mea_wb = w;
-    fz = _fz;
-  }
+} else {
 
-  // Otherwise use values predicted from last update for current state
+  mea_vel = v;
+  fz = _fz;
+}
 
-  // Now forward propagate by dt
-  Eigen::Vector3d accel = -fz*R.col(2);
-  accel(2) += g;
+mea_R = R;
+mea_wb = w;
+R2euler_123();
 
-  mea_pos += mea_vel*dt + 0.5*accel*(dt*dt);
-  mea_vel += accel*dt;
-
-  R2euler_123();
 }
 
 /********* Coordinate conversions ***********/
