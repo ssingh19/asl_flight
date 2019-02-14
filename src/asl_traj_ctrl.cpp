@@ -308,7 +308,7 @@ int main(int argc, char **argv)
     // Compute nominal
     if (time_traj >= TAKEOFF_TIME) {
       // Once past takeoff time, start trajectory
-      ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
+      // ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
       traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer);
     } else {
       if (DO_TAKEOFF) {

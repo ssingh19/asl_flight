@@ -179,18 +179,17 @@ int main(int argc, char **argv)
     // Check for state update
     ros::spinOnce();
 
-    debug_msg.data = mea_pos(0);
+    debug_msg.data = r_pos(0);
     debug_pub1.publish(debug_msg);
-    debug_msg.data = mea_pos(1);
+    debug_msg.data = mea_pos(0);
     debug_pub2.publish(debug_msg);
-    debug_msg.data = mea_pos(2);
+    debug_msg.data = r_pos(1);
     debug_pub3.publish(debug_msg);
-
-    debug_msg.data = mea_vel(0);
+    debug_msg.data = mea_pos(1);
     debug_pub4.publish(debug_msg);
-    debug_msg.data = mea_vel(1);
+    debug_msg.data = r_pos(2);
     debug_pub5.publish(debug_msg);
-    debug_msg.data = mea_vel(2);
+    debug_msg.data = mea_pos(2);
     debug_pub6.publish(debug_msg);
 
     debug_msg.data = mea_q(0);
@@ -216,6 +215,8 @@ int main(int argc, char **argv)
 
           // initialize ref pos to be current location
           r_pos << mea_pos(0), mea_pos(1), mea_pos(2);
+
+          ROS_INFO("hold_pos: (%.3f,%.3f,%.3f)",r_pos(0),r_pos(1),r_pos(2));
 
       } else {
           // offboard already initialized
