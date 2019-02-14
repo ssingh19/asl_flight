@@ -121,8 +121,8 @@ int main(int argc, char **argv)
 
   // Subscriptions
   ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 1, state_cb);
-  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 2, poseSubCB);
-  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 2, velSubCB);
+  ros::Subscriber poseSub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 1, poseSubCB);
+  ros::Subscriber velSub = nh.subscribe<geometry_msgs::TwistStamped>("mavros/local_position/velocity", 1, velSubCB);
 
   pose_up = 0; vel_up = 0;
 
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 
   // Define controller classes
   ros::param::get("~FZ_EST_N", FZ_EST_N);
-  CCMController ctrl(FZ_EST_N/2.0);
+  CCMController ctrl(1.0);
 
 
   // Define trajectory class
