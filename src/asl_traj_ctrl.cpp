@@ -200,7 +200,7 @@ int main(int argc, char **argv)
   double dt = 0.0;
 
   // Reference values
-  double yaw_des = 0.0;
+  double yaw_des = M_PI/2.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);

@@ -39,13 +39,13 @@
 		<param name="TAKEOFF_HGT" value="1.47" />
 		<param name="TAKEOFF_TIME" value="10.0" />
 		<param name="START_DELAY" value="5.0"/>
-		<param name="CIRCLE_T" value="8.0"/>
+		<param name="CIRCLE_T" value="6.0"/>
 		<param name="POLY_SCALE" value="2.0"/>
 		<param name="FZ_EST_N" value="8.0" />
 	</node>
 
 	<!-- <node pkg="asl_flight" type="asl_wp_ctrl" name="asl_wp_ctrl" output="screen" >
-		<param name="CMD_HOLD" type="bool" value="false" />
+		<param name="CMD_HOLD" type="bool" value="true" />
 		<param name="REF_X" value="0.0" />
 		<param name="REF_Y" value="0.0" />
 		<param name="REF_Z" value="-1.0"/>

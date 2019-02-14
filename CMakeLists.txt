@@ -174,6 +174,11 @@ add_executable(tf2pose
 add_dependencies(tf2pose ${PROJECT_NAME}_gencfg)
 target_link_libraries(tf2pose ${catkin_LIBRARIES})
 
+add_executable(vrpn2pose
+  src/vrpn2pose.cpp)
+add_dependencies(vrpn2pose ${PROJECT_NAME}_gencfg)
+target_link_libraries(vrpn2pose ${catkin_LIBRARIES})
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
