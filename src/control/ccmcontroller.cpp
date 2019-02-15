@@ -66,26 +66,30 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
 
   dt = _dt;
 
+  if (vel_up == 0) {
+    fz = fzCmd;
+  } else {
+    fz = _fz;
+  }
+
   if (pose_up == 0 && active) {
 
-  Eigen::Vector3d accel = -fzCmd*R.col(2);
-  accel(2) += g;
-  mea_pos += v*dt + 0.5*accel*(dt*dt);
+    Eigen::Vector3d accel = -fz*R.col(2);
+    accel(2) += g;
+    mea_pos += mea_vel*dt + 0.5*accel*(dt*dt);
 
   } else { mea_pos = r;}
 
   if (vel_up == 0 && active) {
 
-  Eigen::Vector3d accel = -fzCmd*R.col(2);
-  accel(2) += g;
-  mea_vel += accel*dt;
-  fz = fzCmd;
+    Eigen::Vector3d accel = -fz*R.col(2);
+    accel(2) += g;
+    mea_vel += accel*dt;
 
   } else {
 
-  mea_vel = v;
-  fz = _fz;
-  
+    mea_vel = v;
+
   }
 
   mea_R = R;

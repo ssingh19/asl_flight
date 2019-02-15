@@ -178,7 +178,8 @@ int main(int argc, char **argv)
 
   } else if (traj_type == "FIG8") {
 
-    traj = new Fig8Trajectory(2.0, 1.0, 2.0*M_PI*(1.0/circle_T), start_delay);
+    ros::param::get("~CIRCLE_T", circle_T);
+    traj = new Fig8Trajectory(1.0, 1.0, 2.0*M_PI*(1.0/circle_T), start_delay);
 
   } else  {
 
