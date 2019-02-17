@@ -116,7 +116,9 @@ Eigen::MatrixXd PolyTrajectory::expand_coeffs(Eigen::MatrixXd& _coeffs)
 void PolyTrajectory::eval(double t, Eigen::Vector3d &pos,
                                     Eigen::Vector3d &vel,
                                     Eigen::Vector3d &acc,
-                                    Eigen::Vector3d &jer)
+                                    Eigen::Vector3d &jer,
+																	  double &yaw,
+																	  double &yaw_dot)
 {
 
 	double traj_valid = 1.0;
@@ -188,6 +190,9 @@ void PolyTrajectory::eval(double t, Eigen::Vector3d &pos,
 	jer(0) = output(9) * traj_valid/(scale*scale*scale);
 	jer(1) = output(10) * traj_valid/(scale*scale*scale);
 	jer(2) = output(11) * traj_valid/(scale*scale*scale);
+
+	yaw = 0.0;
+	yaw_dot = 0.0;
 
 }
 

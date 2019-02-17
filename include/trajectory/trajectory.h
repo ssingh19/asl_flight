@@ -11,7 +11,8 @@ class Trajectory
 {
 public:
   Trajectory() {};
-  virtual void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer) {};
+  virtual void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+                    double &yaw, double &yaw_dot) {};
 
 //  virtual void set_output(int index, double value) {};
   virtual void set_start_pos(const Eigen::Vector3d &_start_pos) {};
@@ -23,7 +24,8 @@ private:
 
 public:
   HoverTrajectory();
-  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
+  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+            double &yaw, double &yaw_dot);
   void set_start_pos(const Eigen::Vector3d &_start_pos);
 
 };
@@ -37,7 +39,8 @@ private:
 
 public:
   CircleTrajectory(double _radius, double _om, double _start_delay);
-  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
+  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+            double &yaw, double &yaw_dot);
 
   void set_start_pos(const Eigen::Vector3d &_start_pos);
 
@@ -53,7 +56,8 @@ private:
 
 public:
   Fig8Trajectory(double _radius_x, double _radius_y, double _om, double _start_delay);
-  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
+  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+            double &yaw, double &yaw_dot);
 
   void set_start_pos(const Eigen::Vector3d &_start_pos);
 
@@ -72,7 +76,8 @@ private:
 
 public:
   PolyTrajectory(double _scale, double _start_delay);
-  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer);
+  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+            double &yaw, double &yaw_dot);
 
   void set_start_pos(const Eigen::Vector3d &_start_pos);
 

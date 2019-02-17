@@ -10,7 +10,8 @@ CircleTrajectory::CircleTrajectory(double _radius, double _om, double _start_del
 		start_pos << 0, 0, 0;
 }
 
-void CircleTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer)
+void CircleTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+														double &yaw, double &yaw_dot)
 {
 
 
@@ -27,12 +28,16 @@ void CircleTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel
 		vel.setZero();
 		acc.setZero();
 		jer.setZero();
+		yaw = 0.0;
+		yaw_dot = 0.0;
 	} else {
 		t = t-start_delay;
 		pos << radius*sin(om*t)+start_pos(0), radius-radius*cos(om*t)+start_pos(1), start_pos(2);
 		vel << om*radius*cos(om*t), om*radius*sin(om*t), 0.0;
 		acc << -om*om*radius*sin(om*t), om*om*radius*cos(om*t), 0.0;
 		jer << -om*om*om*radius*cos(om*t), -om*om*om*radius*sin(om*t), 0.0;
+		yaw = 0.0;
+		yaw_dot = 0.0;
 	}
 
 }

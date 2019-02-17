@@ -147,6 +147,9 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub13 = nh.advertise<std_msgs::Float64>("/debug13", 1);
   ros::Publisher debug_pub14 = nh.advertise<std_msgs::Float64>("/debug14", 1);
   ros::Publisher debug_pub15 = nh.advertise<std_msgs::Float64>("/debug15", 1);
+  ros::Publisher debug_pub16 = nh.advertise<std_msgs::Float64>("/debug16", 1);
+  ros::Publisher debug_pub17 = nh.advertise<std_msgs::Float64>("/debug17", 1);
+  ros::Publisher debug_pub18 = nh.advertise<std_msgs::Float64>("/debug18", 1);
   std_msgs::Float64 debug_msg;
 
   // Define controller classes
@@ -207,7 +210,8 @@ int main(int argc, char **argv)
   double dt = 0.0;
 
   // Reference values
-  double yaw_des = 0.0;
+  double yaw_des = M_PI/2.0;
+  double yaw_dot_des = 0.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);
@@ -253,13 +257,20 @@ int main(int argc, char **argv)
     debug_msg.data = mea_pos(2);
     debug_pub6.publish(debug_msg);
 
+    debug_msg.data = mea_vel(0);
+    debug_pub7.publish(debug_msg);
+    debug_msg.data = mea_vel(1);
+    debug_pub8.publish(debug_msg);
+    debug_msg.data = mea_vel(2);
+    debug_pub9.publish(debug_msg);
+
     // Get commanded normalized thrust
     fz_cmd = ctrl.getfz();
 
     debug_msg.data = fz_cmd;
-    debug_pub14.publish(debug_msg);
+    debug_pub17.publish(debug_msg);
     debug_msg.data = fz_est;
-    debug_pub15.publish(debug_msg);
+    debug_pub18.publish(debug_msg);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;
@@ -310,7 +321,7 @@ int main(int argc, char **argv)
     if (time_traj >= TAKEOFF_TIME) {
       // Once past takeoff time, start trajectory
       // ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
-      traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer);
+      traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer, yaw_des, yaw_dot_des);
     } else {
       if (DO_TAKEOFF) {
         // smooth takeoff
@@ -321,7 +332,7 @@ int main(int argc, char **argv)
     ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
 
     // Compute feedback
-    ctrl.calcCCM(yaw_des, r_pos, r_vel, r_acc, r_jer);
+    ctrl.calcCCM(yaw_des, yaw_dot_des, r_pos, r_vel, r_acc, r_jer);
 
     // publish commands
     fz_cmd = ctrl.getfz();
@@ -343,21 +354,21 @@ int main(int argc, char **argv)
 
     // Publish
     debug_msg.data = euler(0);
-    debug_pub7.publish(debug_msg);
-    debug_msg.data = euler(1);
-    debug_pub8.publish(debug_msg);
-    debug_msg.data = euler(2);
-    debug_pub9.publish(debug_msg);
-
-    debug_msg.data = ref_om(0);
     debug_pub10.publish(debug_msg);
-    debug_msg.data = ref_om(1);
+    debug_msg.data = euler(1);
     debug_pub11.publish(debug_msg);
-    debug_msg.data = ref_om(2);
+    debug_msg.data = euler(2);
     debug_pub12.publish(debug_msg);
 
-    debug_msg.data = ctrl.getE();
+    debug_msg.data = ref_om(0);
     debug_pub13.publish(debug_msg);
+    debug_msg.data = ref_om(1);
+    debug_pub14.publish(debug_msg);
+    debug_msg.data = ref_om(2);
+    debug_pub15.publish(debug_msg);
+
+    debug_msg.data = ctrl.getE();
+    debug_pub16.publish(debug_msg);
 
     // Reset update
     pose_up = 0; vel_up = 0;

@@ -126,7 +126,10 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
                 const Eigen::Vector3d &r_vel,
                 const Eigen::Vector3d &r_acc,
                 const Eigen::Vector3d &r_jer,
-                const double yaw_des){
+                const double yaw_des,
+                const double yaw_dot_des){
+
+  // yaw_des w.r.t 321
 
   _xc_nom(0) = r_pos(0); _xc_nom(1) = r_pos(1); _xc_nom(2) = r_pos(2);
   _xc_nom(3) = r_vel(0); _xc_nom(4) = r_vel(1); _xc_nom(5) = r_vel(2);
@@ -134,27 +137,45 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
   Eigen::Vector3d th_vec(r_acc(0), r_acc(1), r_acc(2)-g);
   _xc_nom(6) = th_vec.norm();
 
-  _xc_nom(7) = std::atan2(r_acc(1),g-r_acc(2));
-  _xc_nom(8) = std::asin(-r_acc(0)/_xc_nom(6));
-  _xc_nom(9) = yaw_des;
+  Eigen::Vector3d zb = -th_vec.normalized();
+
+  Eigen::Vector3d yc(-sin(yaw_des),cos(yaw_des),0.0);
+
+  Eigen::Vector3d xb_des = yc.cross(zb);
+  Eigen::Vector3d xb = xb_des.normalized();
+
+  Eigen::Vector3d yb = zb.cross(xb);
+
+  _xc_nom(7) = std::atan2(-zb(1),zb(2));
+  _xc_nom(8) = std::asin(zb(0));
+  _xc_nom(9) = std::atan2(-yb(0), xb(0));
+
+  double om_x, om_y, om_z = 0.0;
+
+  if (_xc_nom(6) > 0.0) {
+    double om_x =  (1.0/_xc_nom(6)) * ( r_jer.dot(yb) );
+    double om_y = -(1.0/_xc_nom(6)) * ( r_jer.dot(xb) );
+  }
+
+  Eigen::Vector3d zb_dot = om_y*xb - om_x*yb;
+
+  Eigen::Vector3d yc_dot(-yaw_dot_des*cos(yaw_des), -yaw_dot_des*sin(yaw_des), 0.0);
+
+  Eigen::Vector3d xb_des_dot = yc_dot.cross(zb) + yc.cross(zb_dot);
+
+  if (xb_des.norm() > 0.0) {
+    double om_z = yb.dot( (1/xb_des.norm()) * xb_des_dot );
+  }
 
   _uc_nom(0) = th_vec.normalized().dot(r_jer);
 
-  Euler2R_123(_xc_nom(7),_xc_nom(8),_xc_nom(9));
+  _uc_nom(1) = om_x*(cos(_xc_nom(9))/cos(_xc_nom(8)))-
+               om_y*(sin(_xc_nom(9))/cos(_xc_nom(8)));
+  _uc_nom(2) = sin(_xc_nom(9))*om_x + cos(_xc_nom(9))*om_y;
 
-  double om_1 = 0.0;
-  double om_2 = 0.0;
-  if (_xc_nom(6)>0.0) {
-    om_1 = r_jer.dot(_R_des.col(1))*(1.0/_xc_nom(6));
-    om_2 = -r_jer.dot(_R_des.col(0))*(1.0/_xc_nom(6));
-  }
-
-  _uc_nom(1) = om_1*(cos(yaw_des)/cos(_xc_nom(8)))-
-               om_2*(sin(yaw_des)/cos(_xc_nom(8)));
-  _uc_nom(2) = sin(yaw_des)*om_1 + cos(yaw_des)*om_2;
-  _uc_nom(3) = 0.0; // force
-
-  double om_3 = sin(_xc_nom(7))*_uc_nom(1)+_uc_nom(3);
+  _uc_nom(3) = -cos(_xc_nom(9))*tan(_xc_nom(8)) * om_x +
+                sin(_xc_nom(9))*tan(_xc_nom(8)) * om_y +
+                om_z;
 }
 
 void CCMController::calc_CCM_dyn(const Eigen::VectorXd &xc,const Eigen::Vector4d &uc,
@@ -195,16 +216,22 @@ Eigen::Vector3d CCMController::getEuler(){
 }
 
 /********* CCM compute ***********/
-void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos, const Eigen::Vector3d &r_vel,
+void CCMController::calcCCM(const double yaw_des, const double yaw_dot_des, const Eigen::Vector3d &r_pos, const Eigen::Vector3d &r_vel,
           const Eigen::Vector3d &r_acc, const Eigen::Vector3d &r_jer) {
 
 
   if (active){
     // Compute nominal xc and uc
-    calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des);
+    calc_xc_uc_nom(r_pos,r_vel,r_acc,r_jer,yaw_des,yaw_dot_des);
 
     // Now compute actual xc
     _xc << mea_pos, mea_vel, fzCmd, euler;
+
+    // Correct yaw
+    if ( std::max( abs(_xc_nom(9)) , abs(_xc(9)) ) > M_PI/2.0 ) {
+      _xc_nom(9) = _xc_nom(9) > 0.0 ? _xc_nom(9) : _xc_nom(9) + 2*M_PI;
+      _xc(9) = _xc(9) > 0.0 ? _xc(9) : _xc(9) + 2*M_PI;
+    }
 
     // Straight-line appproximation of geodesic
     X_dot_EndP.col(0) = _xc - _xc_nom;
@@ -256,7 +283,7 @@ void CCMController::calcCCM(const double &yaw_des, const Eigen::Vector3d &r_pos,
 
     // Update desired euler_dot_rate
     for (int i = 0; i<3; i++){
-      euler_dot(i) = std::max(std::min(_uc_nom(i+1)+uc_fb(i+1),3.0),-3.0);
+      euler_dot(i) = std::max(std::min(_uc_nom(i+1)+uc_fb(i+1),5.0),-5.0);
     }
 
   } else {

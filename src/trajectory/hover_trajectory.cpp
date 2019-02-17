@@ -7,12 +7,15 @@ HoverTrajectory::HoverTrajectory()
 		start_pos << 0, 0, 0;
 }
 
-void HoverTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer)
+void HoverTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+													 double &yaw, double &yaw_dot)
 {
 	pos = start_pos;
 	vel.setZero();
 	acc.setZero();
 	jer.setZero();
+	yaw = 0.0;
+	yaw_dot = 0.0;
 
 }
 

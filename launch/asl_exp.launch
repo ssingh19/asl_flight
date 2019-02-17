@@ -39,7 +39,7 @@
 		<param name="TAKEOFF_HGT" value="1.0" />
 		<param name="TAKEOFF_TIME" value="10.0" />
 		<param name="START_DELAY" value="5.0"/>
-		<param name="CIRCLE_T" value="10.0"/>
+		<param name="CIRCLE_T" value="12.0"/>
 		<param name="POLY_SCALE" value="2.0"/>
 		<param name="FZ_EST_N" value="8.0" />
 		<param name="FZ_CTRL_N" value="2.0" />

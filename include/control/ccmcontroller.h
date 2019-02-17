@@ -73,7 +73,8 @@ private:
                       const Eigen::Vector3d &r_vel,
                       const Eigen::Vector3d &r_acc,
                       const Eigen::Vector3d &r_jer,
-                      const double yaw_des); // compute xc, uc nom
+                      const double yaw_des,
+                      const double yaw_dot_des); // compute xc, uc nom
 
   // Coordinate conversions
   void R2euler_123(void);
@@ -90,7 +91,8 @@ public:
 
   // compute
   void calcCCM(
-          const double &yaw_des,
+          const double yaw_des,
+          const double yaw_dot_des,
           const Eigen::Vector3d &r_pos,
           const Eigen::Vector3d &r_vel,
           const Eigen::Vector3d &r_acc,
