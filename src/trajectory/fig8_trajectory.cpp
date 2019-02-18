@@ -25,13 +25,20 @@ void Fig8Trajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, 
 		yaw_dot = 0.0;
 	} else {
 		t = t-start_delay;
-		pos <<  radius_x - radius_x*cos(om*t)+start_pos(0), radius_y*sin(2*om*t)+start_pos(1), start_pos(2);
-		vel <<  om*radius_x*sin(om*t), radius_y*2*om*cos(2*om*t), 0.0;
-		acc <<  om*om*radius_x*cos(om*t), -radius_y*4*om*om*sin(2*om*t), 0.0;
-		jer << -om*om*om*radius_x*sin(om*t), -radius_y*8*om*om*om*cos(2*om*t), 0.0;
 
-		yaw = (M_PI/2.0) - (3.0*M_PI/4.0)*sin(om*t);
-		yaw_dot = -(3.0*M_PI/4.0)*om*cos(om*t);
+		double om_ = om;
+
+		if (t < 4.0*M_PI/om) {
+				om_ = 0.5*om;
+		}
+
+		pos <<  radius_x - radius_x*cos(om_*t)+start_pos(0), radius_y*sin(2*om_*t)+start_pos(1), start_pos(2);
+		vel <<  om_*radius_x*sin(om_*t), radius_y*2*om_*cos(2*om_*t), 0.0;
+		acc <<  om_*om_*radius_x*cos(om_*t), -radius_y*4*om_*om_*sin(2*om_*t), 0.0;
+		jer << -om_*om_*om_*radius_x*sin(om_*t), -radius_y*8*om_*om_*om_*cos(2*om_*t), 0.0;
+
+		yaw = (M_PI/2.0) - (3.0*M_PI/4.0)*sin(om_*t);
+		yaw_dot = -(3.0*M_PI/4.0)*om_*cos(om_*t);
 	}
 
 }
