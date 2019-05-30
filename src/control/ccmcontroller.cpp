@@ -86,11 +86,7 @@ void CCMController::updateState(const Eigen::Vector3d &r, const Eigen::Matrix3d 
     accel(2) += g;
     mea_vel += accel*dt;
 
-  } else {
-
-    mea_vel = v;
-
-  }
+  } else {  mea_vel = v;}
 
   mea_R = R;
   mea_wb = w;
@@ -153,8 +149,8 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
   double om_x, om_y, om_z = 0.0;
 
   if (_xc_nom(6) > 0.0) {
-    double om_x =  (1.0/_xc_nom(6)) * ( r_jer.dot(yb) );
-    double om_y = -(1.0/_xc_nom(6)) * ( r_jer.dot(xb) );
+    om_x =  (1.0/_xc_nom(6)) * ( r_jer.dot(yb) );
+    om_y = -(1.0/_xc_nom(6)) * ( r_jer.dot(xb) );
   }
 
   Eigen::Vector3d zb_dot = om_y*xb - om_x*yb;

@@ -163,7 +163,7 @@ int main(int argc, char **argv)
   // Define trajectory class
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
-  double circle_T;
+
   double start_delay;
   ros::param::get("~START_DELAY", start_delay);
 
@@ -171,6 +171,7 @@ int main(int argc, char **argv)
 
   if (traj_type == "CIRCLE") {
 
+    double circle_T;
     ros::param::get("~CIRCLE_T", circle_T);
     traj = new CircleTrajectory(1.0, 2.0*M_PI*(1.0/circle_T),start_delay);
 
@@ -182,8 +183,9 @@ int main(int argc, char **argv)
 
   } else if (traj_type == "FIG8") {
 
-    ros::param::get("~CIRCLE_T", circle_T);
+    double circle_T;
     double radius_x, radius_y = 1.0;
+    ros::param::get("~CIRCLE_T", circle_T);
     ros::param::get("~RADIUS_X", radius_x);
     ros::param::get("~RADIUS_Y", radius_y);
     traj = new Fig8Trajectory(radius_x, radius_y, 2.0*M_PI*(1.0/circle_T), start_delay);
@@ -217,7 +219,6 @@ int main(int argc, char **argv)
   double yaw_des = 0.0;
   double yaw_init = 0.0;
   ros::param::get("~YAW_INIT", yaw_init);
-  if (yaw_init > 0.0){ yaw_init = M_PI/2.0; }
 
   double yaw_dot_des = 0.0;
   Eigen::Vector3d r_pos(0, 0, 0);
