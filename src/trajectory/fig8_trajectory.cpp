@@ -9,6 +9,8 @@ Fig8Trajectory::Fig8Trajectory(double _radius_x, double _radius_y, double _om, d
     radius_y = _radius_y;
 		om = _om;
 		start_pos << 0, 0, 0;
+
+		ROS_INFO("radius_x: %.3f, radius_y:%.3f", radius_x, radius_y);
 }
 
 void Fig8Trajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
@@ -21,24 +23,34 @@ void Fig8Trajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, 
 		vel.setZero();
 		acc.setZero();
 		jer.setZero();
-		yaw = M_PI/2.0;
+		yaw = 0.0;
 		yaw_dot = 0.0;
 	} else {
 		t = t-start_delay;
 
 		double om_ = om;
+		double t_ = 0.0;
 
-		if (t < 4.0*M_PI/om) {
-				om_ = 0.5*om;
+		if (t < 2.0*2.0*M_PI/om) {
+			om_ = (1.0/2.0)*om;
+		} else if (t >= 2.0*2.0*M_PI/om && t < (2.0+1.5)*2.0*M_PI/om) {
+			om_ = (1.0/1.5)*om;
+			t_ = 2.0*2.0*M_PI/om;
+		} else {
+			t_ = 3.5*2.0*M_PI/om;
 		}
+
+		t = t - t_;
 
 		pos <<  radius_x - radius_x*cos(om_*t)+start_pos(0), radius_y*sin(2*om_*t)+start_pos(1), start_pos(2);
 		vel <<  om_*radius_x*sin(om_*t), radius_y*2*om_*cos(2*om_*t), 0.0;
 		acc <<  om_*om_*radius_x*cos(om_*t), -radius_y*4*om_*om_*sin(2*om_*t), 0.0;
 		jer << -om_*om_*om_*radius_x*sin(om_*t), -radius_y*8*om_*om_*om_*cos(2*om_*t), 0.0;
 
-		yaw = (M_PI/2.0) - (3.0*M_PI/4.0)*sin(om_*t);
+		yaw = -(3.0*M_PI/4.0)*sin(om_*t);
 		yaw_dot = -(3.0*M_PI/4.0)*om_*cos(om_*t);
+		// yaw = 0.0;
+		// yaw_dot = 0.0;
 	}
 
 }

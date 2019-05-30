@@ -14,7 +14,7 @@ void HoverTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel,
 	vel.setZero();
 	acc.setZero();
 	jer.setZero();
-	yaw = M_PI/2.0;
+	yaw = 0.0;
 	yaw_dot = 0.0;
 
 }

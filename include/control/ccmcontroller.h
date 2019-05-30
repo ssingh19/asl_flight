@@ -104,6 +104,7 @@ public:
   Eigen::Vector3d getEr();
   Eigen::Vector3d getOm();
   Eigen::Vector3d getEuler();
+  double getYawNom();
 
   void setMode(const bool _m);
 };

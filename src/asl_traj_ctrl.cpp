@@ -150,6 +150,7 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub16 = nh.advertise<std_msgs::Float64>("/debug16", 1);
   ros::Publisher debug_pub17 = nh.advertise<std_msgs::Float64>("/debug17", 1);
   ros::Publisher debug_pub18 = nh.advertise<std_msgs::Float64>("/debug18", 1);
+  ros::Publisher debug_pub19 = nh.advertise<std_msgs::Float64>("/debug19", 1);
   std_msgs::Float64 debug_msg;
 
   // Define controller classes
@@ -163,7 +164,6 @@ int main(int argc, char **argv)
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
   double circle_T;
-  double poly_scale;
   double start_delay;
   ros::param::get("~START_DELAY", start_delay);
 
@@ -176,13 +176,17 @@ int main(int argc, char **argv)
 
   } else if (traj_type == "POLY") {
 
+    double poly_scale;
     ros::param::get("~POLY_SCALE", poly_scale);
     traj = new PolyTrajectory(poly_scale, start_delay);
 
   } else if (traj_type == "FIG8") {
 
     ros::param::get("~CIRCLE_T", circle_T);
-    traj = new Fig8Trajectory(1.0, 1.0, 2.0*M_PI*(1.0/circle_T), start_delay);
+    double radius_x, radius_y = 1.0;
+    ros::param::get("~RADIUS_X", radius_x);
+    ros::param::get("~RADIUS_Y", radius_y);
+    traj = new Fig8Trajectory(radius_x, radius_y, 2.0*M_PI*(1.0/circle_T), start_delay);
 
   } else  {
 
@@ -210,7 +214,11 @@ int main(int argc, char **argv)
   double dt = 0.0;
 
   // Reference values
-  double yaw_des = M_PI/2.0;
+  double yaw_des = 0.0;
+  double yaw_init = 0.0;
+  ros::param::get("~YAW_INIT", yaw_init);
+  if (yaw_init > 0.0){ yaw_init = M_PI/2.0; }
+
   double yaw_dot_des = 0.0;
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
@@ -268,9 +276,9 @@ int main(int argc, char **argv)
     fz_cmd = ctrl.getfz();
 
     debug_msg.data = fz_cmd;
-    debug_pub17.publish(debug_msg);
-    debug_msg.data = fz_est;
     debug_pub18.publish(debug_msg);
+    debug_msg.data = fz_est;
+    debug_pub19.publish(debug_msg);
 
     // Time loop calculations
     dt = ros::Time::now().toSec() - time_prev;
@@ -322,12 +330,20 @@ int main(int argc, char **argv)
       // Once past takeoff time, start trajectory
       // ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
       traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer, yaw_des, yaw_dot_des);
+
+      // add offset
+      yaw_des += yaw_init;
+
     } else {
       if (DO_TAKEOFF) {
         // smooth takeoff
         r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
+
+        yaw_des = yaw_init;
+
       }
     }
+
     // Update controller internal state
     ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
 
@@ -359,16 +375,18 @@ int main(int argc, char **argv)
     debug_pub11.publish(debug_msg);
     debug_msg.data = euler(2);
     debug_pub12.publish(debug_msg);
+    debug_msg.data = ctrl.getYawNom();
+    debug_pub13.publish(debug_msg);
 
     debug_msg.data = ref_om(0);
-    debug_pub13.publish(debug_msg);
-    debug_msg.data = ref_om(1);
     debug_pub14.publish(debug_msg);
-    debug_msg.data = ref_om(2);
+    debug_msg.data = ref_om(1);
     debug_pub15.publish(debug_msg);
+    debug_msg.data = ref_om(2);
+    debug_pub16.publish(debug_msg);
 
     debug_msg.data = ctrl.getE();
-    debug_pub16.publish(debug_msg);
+    debug_pub17.publish(debug_msg);
 
     // Reset update
     pose_up = 0; vel_up = 0;

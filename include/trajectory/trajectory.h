@@ -69,10 +69,16 @@ private:
   Eigen::Vector3d start_pos;
   Eigen::VectorXd switch_time;
   std::vector<Eigen::MatrixXd> cp;
+  std::vector<Eigen::MatrixXd> cp_yaw;
+
+  Eigen::VectorXd output;
+  Eigen::Vector2d output_yaw;
+
   double start_delay;
   double scale;
 
   Eigen::MatrixXd expand_coeffs(Eigen::MatrixXd& _coeffs);
+  Eigen::MatrixXd expand_coeffs_yaw(Eigen::MatrixXd& _coeffs);
 
 public:
   PolyTrajectory(double _scale, double _start_delay);

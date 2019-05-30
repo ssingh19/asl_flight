@@ -30,8 +30,8 @@ CCMController::CCMController(const double N):
   double d_bar = 0.0420;
   double yaw_bound = 10.0*PI/180.0;
   _M_yaw = std::pow((d_bar/yaw_bound),2.0);
-  _M_nom(9,9) = _M_yaw;
-  _M(9,9) = _M_yaw;
+  _M_nom(9,9) = _M_yaw; //0.0; //_M_yaw;
+  _M(9,9) = _M_yaw; //0.0; //_M_yaw;
 
   _B_ctrl = Eigen::MatrixXd(10,4);
   _B_ctrl << Eigen::MatrixXd::Zero(6,4),
@@ -164,13 +164,14 @@ void CCMController::calc_xc_uc_nom(const Eigen::Vector3d &r_pos,
   Eigen::Vector3d xb_des_dot = yc_dot.cross(zb) + yc.cross(zb_dot);
 
   if (xb_des.norm() > 0.0) {
-    double om_z = yb.dot( (1/xb_des.norm()) * xb_des_dot );
+    om_z = yb.dot( (1.0/xb_des.norm()) * xb_des_dot );
   }
 
   _uc_nom(0) = th_vec.normalized().dot(r_jer);
 
   _uc_nom(1) = om_x*(cos(_xc_nom(9))/cos(_xc_nom(8)))-
                om_y*(sin(_xc_nom(9))/cos(_xc_nom(8)));
+
   _uc_nom(2) = sin(_xc_nom(9))*om_x + cos(_xc_nom(9))*om_y;
 
   _uc_nom(3) = -cos(_xc_nom(9))*tan(_xc_nom(8)) * om_x +
@@ -213,6 +214,10 @@ Eigen::Vector3d CCMController::getOm(){
 
 Eigen::Vector3d CCMController::getEuler(){
   return euler;
+}
+
+double CCMController::getYawNom(){
+  return _xc_nom(9);
 }
 
 /********* CCM compute ***********/
@@ -258,7 +263,11 @@ void CCMController::calcCCM(const double yaw_des, const double yaw_dot_des, cons
       uc_fb = -(a/b.norm()) * b.normalized();
     }
 
+    // Manual yaw_rate fb
+    // uc_fb(3) = 2.8 * (_xc_nom(9) - _xc(9));
+
     // Debug controller comp
+
     /*
     ROS_INFO("xc_nom:%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f",
              _xc_nom(0),_xc_nom(1),_xc_nom(2),
