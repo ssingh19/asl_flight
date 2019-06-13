@@ -47,10 +47,10 @@ void Fig8Trajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, 
 		acc <<  om_*om_*radius_x*cos(om_*t), -radius_y*4*om_*om_*sin(2*om_*t), 0.0;
 		jer << -om_*om_*om_*radius_x*sin(om_*t), -radius_y*8*om_*om_*om_*cos(2*om_*t), 0.0;
 
-		yaw = -(3.0*M_PI/4.0)*sin(om_*t);
-		yaw_dot = -(3.0*M_PI/4.0)*om_*cos(om_*t);
-		// yaw = 0.0;
-		// yaw_dot = 0.0;
+		// yaw = -(3.0*M_PI/4.0)*sin(om_*t);
+		// yaw_dot = -(3.0*M_PI/4.0)*om_*cos(om_*t);
+		yaw = 0.0;
+		yaw_dot = 0.0;
 	}
 
 }

@@ -32,14 +32,17 @@ private:
   Eigen::VectorXd _xc_nom;
   Eigen::Matrix3d _R_des;
   Eigen::Vector4d _uc_nom;
+  Eigen::VectorXd _xc_mid;
   Eigen::VectorXd _xc;
   Eigen::VectorXd _xc_nom_dot;
   Eigen::VectorXd _xc_dot;
   Eigen::MatrixXd _W_nom;
+  Eigen::MatrixXd _W_mid;
   Eigen::MatrixXd _W;
   Eigen::MatrixXd _M_nom;
+  Eigen::MatrixXd _M_mid;
   Eigen::MatrixXd _M;
-  Eigen::MatrixXd X_dot_EndP;
+  Eigen::VectorXd _Xc_dot;
   double _M_yaw;
 
   // use for integration

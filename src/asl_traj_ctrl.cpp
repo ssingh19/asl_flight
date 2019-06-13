@@ -244,8 +244,6 @@ int main(int argc, char **argv)
   Eigen::Vector3d ref_om(0,0,0);
   double fz_cmd = 9.8066;
 
-  double loop_dt = 0.0;
-
   while(ros::ok()) {
     // Check for state update
     ros::spinOnce();
@@ -351,7 +349,7 @@ int main(int argc, char **argv)
     // Compute feedback
     ctrl.calcCCM(yaw_des, yaw_dot_des, r_pos, r_vel, r_acc, r_jer);
 
-    // publish commands
+    // get commands
     fz_cmd = ctrl.getfz();
     ref_er = ctrl.getEr();
     ref_om = ctrl.getOm();

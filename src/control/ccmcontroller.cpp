@@ -8,7 +8,7 @@
 CCMController::CCMController(const double N):
     active(false),
     mea_pos(0.0,0.0,0.0), mea_vel(0.0,0.0,0.0), euler(0.0,0.0,0.0), mea_wb(0.0,0.0,0.0), fz(9.8066),
-    _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc(10),_xc_nom_dot(10),_xc_dot(10),
+    _xc_nom(10),_uc_nom(0.0,0.0,0.0,0.0),_xc_mid(10),_xc(10),_xc_nom_dot(10),_xc_dot(10),_Xc_dot(10),
     E(0.0),uc_fb(0.0,0.0,0.0,0.0),fz_dot(0.0),euler_dot(0.0,0.0,0.0),r_wb(0.0,0.0,0.0),
     fzCmd(9.8066),dt(1.0),fz_dot_sum(0.0),filter_N(N),
     g(9.8066), lambda(1.28){
@@ -20,26 +20,28 @@ CCMController::CCMController(const double N):
   // CCM variables
   _xc_nom.setZero(); _xc_nom(6) = g;
   _xc.setZero(); _xc(6) = g;
+  _xc_mid.setZero(); _xc_mid(6) = g;
+
   _xc_nom_dot.setZero();
   _xc_dot.setZero();
+
   _W_nom = Eigen::MatrixXd::Identity(9,9);
+  _W_mid = _W_nom;
   _W = _W_nom;
   _M_nom = Eigen::MatrixXd::Identity(10,10);
+  _M_mid = _M_nom;
   _M = _M_nom;
 
   double d_bar = 0.0420;
   double yaw_bound = 10.0*PI/180.0;
   _M_yaw = std::pow((d_bar/yaw_bound),2.0);
-  _M_nom(9,9) = _M_yaw; //0.0; //_M_yaw;
-  _M(9,9) = _M_yaw; //0.0; //_M_yaw;
+  _M_nom(9,9) = _M_yaw;
+  _M_mid(9,9) = _M_yaw;
+  _M(9,9) = _M_yaw;
 
   _B_ctrl = Eigen::MatrixXd(10,4);
   _B_ctrl << Eigen::MatrixXd::Zero(6,4),
              Eigen::MatrixXd::Identity(4,4);
-
-
-  // Initialize geodesic endpoints
-  X_dot_EndP = Eigen::MatrixXd(10,2);
 
   // Initialize Controller
   setMode(false);
@@ -233,30 +235,38 @@ void CCMController::calcCCM(const double yaw_des, const double yaw_dot_des, cons
       _xc_nom(9) = _xc_nom(9) > 0.0 ? _xc_nom(9) : _xc_nom(9) + 2*M_PI;
       _xc(9) = _xc(9) > 0.0 ? _xc(9) : _xc(9) + 2*M_PI;
     }
+    _xc_mid = 0.5 * (_xc_nom + _xc);
+
 
     // Straight-line appproximation of geodesic
-    X_dot_EndP.col(0) = _xc - _xc_nom;
-    X_dot_EndP.col(1) = _xc - _xc_nom;
+    _Xc_dot = _xc - _xc_nom;
 
     // Compute auxiliaries
     geodesic::compute_W(_xc_nom, _W_nom);
+    geodesic::compute_W(_xc_mid, _W_mid);
     geodesic::compute_W(_xc, _W);
+
     _M_nom.block(0,0,9,9) = _W_nom.inverse();
+    _M_mid.block(0,0,9,9) = _W_mid.inverse();
     _M.block(0,0,9,9) = _W.inverse();
+
     calc_CCM_dyn(_xc_nom, _uc_nom, _xc_nom_dot);
     calc_CCM_dyn(_xc, _uc_nom, _xc_dot);
 
     // Now do the computation
-    E = 0.5*( X_dot_EndP.col(0).dot(_M_nom*X_dot_EndP.col(0))+
-              X_dot_EndP.col(1).dot(_M*X_dot_EndP.col(1)) );
+    E = 0.5*( (1.0/3.0)*_Xc_dot.dot(_M_nom*_Xc_dot)+
+              (4.0/3.0)*_Xc_dot.dot(_M_mid*_Xc_dot)+
+              (1.0/3.0)*_Xc_dot.dot(_M*_Xc_dot) );
 
-    double a = 2.0*lambda*E - 2.0*X_dot_EndP.col(0).dot(_M_nom*_xc_nom_dot)+
-                              2.0*X_dot_EndP.col(1).dot(_M*_xc_dot);
-    Eigen::Vector4d b = (2.0*X_dot_EndP.col(1).transpose()*_M*_B_ctrl).transpose();
+    double a = 2.0*lambda*E - 2.0*_Xc_dot.dot(_M_nom*_xc_nom_dot)+
+                              2.0*_Xc_dot.dot(_M*_xc_dot);
+    // Eigen::Vector4d b = (2.0*_Xc_dot.transpose()*_M*_B_ctrl).transpose();
+    Eigen::Vector4d b = 2.0*_B_ctrl.transpose()*_M*_Xc_dot;
 
-    uc_fb.setZero();
+    // uc_fb.setZero();
     if (b.norm()> 0.0 && a > 0.0){
-      uc_fb = -(a/b.norm()) * b.normalized();
+      // uc_fb = -(a/b.norm()) * b.normalized();
+      uc_fb = (uc_fb/2.0) - ((a+b.dot(uc_fb)/2.0)/b.norm())*b.normalized();
     }
 
     // Manual yaw_rate fb
