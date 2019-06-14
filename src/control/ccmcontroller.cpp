@@ -263,10 +263,10 @@ void CCMController::calcCCM(const double yaw_des, const double yaw_dot_des, cons
     // Eigen::Vector4d b = (2.0*_Xc_dot.transpose()*_M*_B_ctrl).transpose();
     Eigen::Vector4d b = 2.0*_B_ctrl.transpose()*_M*_Xc_dot;
 
-    // uc_fb.setZero();
+    uc_fb.setZero();
     if (b.norm()> 0.0 && a > 0.0){
-      // uc_fb = -(a/b.norm()) * b.normalized();
-      uc_fb = (uc_fb/2.0) - ((a+b.dot(uc_fb)/2.0)/b.norm())*b.normalized();
+      uc_fb = -(a/b.norm()) * b.normalized();
+      // uc_fb = (uc_fb/2.0) - ((a+b.dot(uc_fb)/2.0)/b.norm())*b.normalized();
     }
 
     // Manual yaw_rate fb

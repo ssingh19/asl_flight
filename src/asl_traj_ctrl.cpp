@@ -27,6 +27,11 @@ static Eigen::Matrix<double,3,3> Rz_T =
                                -1.0, 0.0, 0.0,
                                 0.0, 0.0, 1.0).finished();
 
+static Eigen::Matrix<double,3,3> R_corr =
+(Eigen::Matrix<double,3,3>() << 9.99401474e-01, -6.35785870e-04, -3.45874158e-02,
+                                -2.43232100e-19,  9.99831094e-01, -1.83788950e-02,
+                                3.45932588e-02,  1.83678947e-02,  9.99232669e-01).finished();
+
 // Thrust estimation MA
 double FZ_EST_N;
 double fz_est_raw;
