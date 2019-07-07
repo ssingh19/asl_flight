@@ -25,11 +25,13 @@
       <param name="TRAJ" type="str" value="POLY"/>
       <param name="YAW_INIT" value="1.5708" />
       <param name="DO_TAKEOFF" type ="bool" value="true" />
-      <param name="TAKEOFF_HGT" value="1.485" />
+      <param name="TAKEOFF_HGT" value="1.5" />
       <param name="TAKEOFF_TIME" value="10.0" />
       <param name="START_DELAY" value="5.0"/>
-      <param name="CIRCLE_T" value="12.0"/>
-      <param name="POLY_SCALE" value="1.5"/>
+      <param name="CIRCLE_T" value="10.0"/>
+      <param name="RADIUS_X" value="1.0" />
+      <param name="RADIUS_Y" value="0.7" />
+      <param name="POLY_SCALE" value="1.2"/>
       <param name="FZ_EST_N" value="8.0" />
       <param name="FZ_CTRL_N" value="2.0" />
     </node>

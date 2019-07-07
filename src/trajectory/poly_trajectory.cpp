@@ -5,7 +5,7 @@
 
 
 PolyTrajectory::PolyTrajectory(double _scale, double _start_delay):
-	switch_time(15),
+	switch_time(14),
 	output(12),
 	start_delay(_start_delay),
 	scale(_scale)
@@ -18,21 +18,20 @@ PolyTrajectory::PolyTrajectory(double _scale, double _start_delay):
 	start_pos.setZero();
 
 	// switch time
-	switch_time <<  3.3844,
-    6.8201,
-    9.0888,
-   11.9595,
-   14.0552,
-   16.1508,
-   18.5918,
-   21.0249,
-   23.5629,
-   24.8003,
-   26.0198,
-   27.2392,
-   28.4767,
-   30.4367,
-   35.8549;
+	switch_time <<  3.3701,
+    7.0708,
+    8.4846,
+   11.3556,
+   16.1719,
+   18.7593,
+   21.2462,
+   23.6438,
+   24.8812,
+   26.0630,
+   27.2448,
+   28.4823,
+   30.5485,
+   35.9912;
 
 	// for (int i=1; i<switch_time.size(); i++)
 	// {

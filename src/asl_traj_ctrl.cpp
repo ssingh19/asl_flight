@@ -27,11 +27,6 @@ static Eigen::Matrix<double,3,3> Rz_T =
                                -1.0, 0.0, 0.0,
                                 0.0, 0.0, 1.0).finished();
 
-static Eigen::Matrix<double,3,3> R_corr =
-(Eigen::Matrix<double,3,3>() << 9.99401474e-01, -6.35785870e-04, -3.45874158e-02,
-                                -2.43232100e-19,  9.99831094e-01, -1.83788950e-02,
-                                3.45932588e-02,  1.83678947e-02,  9.99232669e-01).finished();
-
 // Thrust estimation MA
 double FZ_EST_N;
 double fz_est_raw;
@@ -76,10 +71,6 @@ void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
 
   mea_q << q_w, q_x, q_y, q_z;
 
-
-  // ROS_INFO("pos: (%.4f, %.4f, %.4f), quat: (%.4f, %.4f, %.4f, %.4f)", mea_pos(0), mea_pos(1), mea_pos(2),
-  //                                                                     q_w, q_x,q_y, q_z);
-
   // Final conversion to rot matrix
   utils::quat2rotM(mea_q, mea_R);
 
@@ -88,7 +79,7 @@ void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
 }
 
 void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
-  // By default, MAVROS gives local_position/velocity in NWU
+  // By default, MAVROS gives local_position/velocity in ENU
 
   vel_prev = mea_vel;
 
@@ -102,9 +93,6 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   mea_wb(0) = msg->twist.angular.y;
   mea_wb(1) = msg->twist.angular.x;
   mea_wb(2) = -msg->twist.angular.z;
-
-  // ROS_INFO("vel: (%.4f, %.4f, %.4f), omb: (%.4f, %.4f: %.4f)", mea_vel(0), mea_vel(1), mea_vel(2),
-  //                                                               mea_wb(0), mea_wb(1), mea_wb(2));
 
   //update accel estimate
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
@@ -360,9 +348,6 @@ int main(int argc, char **argv)
     ref_om = ctrl.getOm();
 
     euler = ctrl.getEuler();
-
-    // ROS_INFO("(%.4f, %.4f, %.4f: %.4f, %.4f, %.4f)", euler(0), euler(1), euler(2), ref_om(0), ref_om(1), ref_om(2));
-    // ROS_INFO("ref_er: (%.4f, %.4f, %.4f)", ref_er(0), ref_er(1), ref_er(2));
 
     att_sp.header.stamp = ros::Time::now();
     att_sp.type_mask = mavros_msgs::AttitudeTarget::IGNORE_ATTITUDE;

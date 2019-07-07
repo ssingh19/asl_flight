@@ -3,8 +3,6 @@
 
 #include <Eigen/Dense>
 
-using namespace Eigen;
-
 namespace utils
 {
   void quat2rotM(const Eigen::Vector4d& q, Eigen::Matrix3d &R);
