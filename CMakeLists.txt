@@ -150,9 +150,25 @@ add_executable(asl_traj_ctrl
   src/trajectory/hover_trajectory.cpp
   src/trajectory/poly_trajectory.cpp
   src/trajectory/fig8_trajectory.cpp
+  src/trajectory/nlp_trajectory.cpp
+  src/trajectory/swoop_trajectory.cpp
   src/utils/utils.cpp)
 add_dependencies(asl_traj_ctrl ${PROJECT_NAME}_gencfg)
 target_link_libraries(asl_traj_ctrl ${catkin_LIBRARIES})
+
+add_executable(pvtol_traj_ctrl
+  src/pvtol_traj_ctrl.cpp
+  src/control/ccmcontroller.cpp
+  src/GeoProb/Geodesic.cpp
+  src/trajectory/circle_trajectory.cpp
+  src/trajectory/hover_trajectory.cpp
+  src/trajectory/poly_trajectory.cpp
+  src/trajectory/fig8_trajectory.cpp
+  src/trajectory/nlp_trajectory.cpp
+  src/trajectory/swoop_trajectory.cpp
+  src/utils/utils.cpp)
+add_dependencies(pvtol_traj_ctrl ${PROJECT_NAME}_gencfg)
+target_link_libraries(pvtol_traj_ctrl ${catkin_LIBRARIES})
 
 #add_executable(se3_traj_ctrl
 #  src/se3_traj_ctrl.cpp

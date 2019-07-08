@@ -33,20 +33,25 @@
 
 	<!-- initialize controller node -->
 
-	<node pkg="asl_flight" type="asl_traj_ctrl" name="asl_traj_ctrl" output="screen" >
-		<param name="TRAJ" type="str" value="SWOOP"/>
-		<param name="YAW_INIT" value="0.0" />
-		<param name="DO_TAKEOFF" type ="bool" value="true" />
-		<param name="Z_INIT" value="-1.35" />
+	<node pkg="asl_flight" type="pvtol_traj_ctrl" name="pvtol_traj_ctrl" output="screen" >
+		<param name="TRAJ" type="str" value="NLP"/>
+		<param name="START_DELAY" value="5.0"/>
+		<param name="Z_INIT" value="-1.0" />
 		<param name="TAKEOFF_TIME" value="10.0" />
 		<param name="START_DELAY" value="5.0"/>
 		<param name="RADIUS_C" value="1.0" />
-		<param name="CIRCLE_T" value="6.0"/>
+		<param name="CIRCLE_T" value="10.0"/>
 		<param name="RADIUS_X" value="1.0" />
 		<param name="RADIUS_Y" value="0.7" />
-		<param name="POLY_SCALE" value="1.0"/>
+		<param name="POLY_SCALE" value="1.2"/>
 		<param name="FZ_EST_N" value="8.0" />
+		<param name="OM_EST_N" value="7.0" />
 		<param name="FZ_CTRL_N" value="2.0" />
+		<param name="KX" value="15.0" />
+		<param name="KV" value="6.0" />
+		<param name="KP" value="4.0" />
+		<param name="KY" value="4.0" />
+		<param name="K_LQR_SCALE" value="0.5" />
 		<param name="YBAR" value="4.0" />
 		<param name="DELTA1" value="1.0" />
 		<param name="DELTA2" value="3.0" />

@@ -32,10 +32,30 @@ void CircleTrajectory::eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel
 		yaw_dot = 0.0;
 	} else {
 		t = t-start_delay;
-		pos << radius*sin(om*t)+start_pos(0), radius-radius*cos(om*t)+start_pos(1), start_pos(2);
-		vel << om*radius*cos(om*t), om*radius*sin(om*t), 0.0;
-		acc << -om*om*radius*sin(om*t), om*om*radius*cos(om*t), 0.0;
-		jer << -om*om*om*radius*cos(om*t), -om*om*om*radius*sin(om*t), 0.0;
+
+		double t_hat = t-5;
+
+		double g = 1.0/(1+std::exp(-t_hat));
+		double gd = g*(1-g);
+		double gdd = gd*(1-g) - g*gd;
+		double gddd = gdd*(1-g) - 2*(gd*gd) - g*gdd;
+
+		double r = radius*g;
+		double rd = radius*gd;
+		double rdd = radius*gdd;
+		double rddd = radius*gddd;
+
+		pos << start_pos(0), r-r*cos(om*t)+start_pos(1), r*sin(om*t)+start_pos(2);
+		vel << 0.0, -rd*cos(om*t)+r*sin(om*t)*om, rd*sin(om*t)+r*cos(om*t)*om;
+
+		acc << 0.0,
+				  -rdd*cos(om*t)+rd*sin(om*t)*om+rd*sin(om*t)*om+r*cos(om*t)*(om*om),
+					 rdd*sin(om*t)+rd*cos(om*t)*om+rd*cos(om*t)*om-r*sin(om*t)*(om*om);
+
+		jer << 0.0,
+				  -rddd*cos(om*t)+rdd*sin(om*t)*om+rdd*sin(om*t)*om+rd*cos(om*t)*(om*om)+rdd*sin(om*t)*om+rd*cos(om*t)*(om*om)+rd*cos(om*t)*(om*om)-r*sin(om*t)*pow(om,3.0),
+					 rddd*cos(om*t)+rdd*cos(om*t)*om+rdd*cos(om*t)*om-rd*sin(om*t)*(om*om)+rdd*cos(om*t)*om-rd*sin(om*t)*(om*om)-rd*sin(om*t)*(om*om)-r*cos(om*t)*pow(om,3.0);
+
 		yaw = 0.0;
 		yaw_dot = 0.0;
 	}

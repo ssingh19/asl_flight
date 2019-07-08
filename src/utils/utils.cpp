@@ -22,6 +22,13 @@ void utils::quat2rotM(const Eigen::Vector4d& q, Eigen::Matrix3d &R){
     2.0*(q2*q4-q1*q3), 2.0*(q3*q4+q1*q2), q1s-q2s-q3s+q4s;
 }
 
+void utils::rotM2Euler(Eigen::Vector3d &eul, const Eigen::Matrix3d &R){
+  // Convert to 123
+  eul(1) = std::asin(R(0,2));
+  eul(0) = std::atan2(-R(1,2),R(2,2));
+  eul(2) = std::atan2(-R(0,1),R(0,0));
+}
+
 void utils::rotM2quat(Eigen::Vector4d& q, const Eigen::Matrix3d &R){
 
   double T = R.trace();
@@ -56,7 +63,7 @@ void utils::rotM2quat(Eigen::Vector4d& q, const Eigen::Matrix3d &R){
       q(2) = 0.5*den;
       q(3) = (R(1,2)+R(2,1))/den;
       break;
-      
+
     default:
       den = sqrt(1-R(0,0)-R(1,1)+R(2,2));
       q(0) = 0.5*(R(1,0)-R(0,1))/den;
@@ -65,6 +72,14 @@ void utils::rotM2quat(Eigen::Vector4d& q, const Eigen::Matrix3d &R){
       q(3) = 0.5*den;
   }
 
+}
 
+void utils::om2er(Eigen::Vector3d& er, const Eigen::Vector3d &om, const Eigen::Vector3d &q) {
+
+  er(0) = (std::cos(q(2))/std::cos(q(1)))*om(0) - (-std::sin(q(2))/std::cos(q(1)) )*om(1);
+
+  er(1) = std::sin(q(2))*om(0) + std::cos(q(2))*om(1);
+
+  er(2) = -std::cos(q(2))*std::tan(q(1))*om(0) + std::sin(q(2))*std::tan(q(1))*om(1) + om(2);
 
 }

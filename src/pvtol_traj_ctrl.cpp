@@ -1,7 +1,7 @@
 #include <iostream>
-#include <control/ccmcontroller.h>
-#include <trajectory/trajectory.h>
 #include <std_msgs/Float64.h>
+#include "geometry_msgs/PoseStamped.h"
+#include "geometry_msgs/TwistStamped.h"
 #include "mavros_msgs/AttitudeTarget.h"
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/Imu.h>
@@ -10,14 +10,21 @@
 #include <ros/console.h>
 
 #include <utils/utils.h>
+#include <trajectory/trajectory.h>
+
+#include <control/ccmcontroller.h>
 #include <GeoProb/Geodesic.h>
 #include <GeoProb/Metric.h>
+
+#define GRAV 9.8066
 
 // Measured states
 std::string current_mode;
 Eigen::Vector4d mea_q;
 Eigen::Matrix3d mea_R;
+Eigen::Vector3d mea_eul;
 Eigen::Vector3d mea_wb;
+Eigen::Vector3d mea_er;
 Eigen::Vector3d mea_pos;
 Eigen::Vector3d mea_vel;
 Eigen::Vector3d vel_prev;
@@ -27,15 +34,59 @@ static Eigen::Matrix<double,3,3> Rz_T =
                                -1.0, 0.0, 0.0,
                                 0.0, 0.0, 1.0).finished();
 
+const Eigen::Matrix<double,2,6> K_LQR_ramp =
+(Eigen::Matrix<double,2,6>() << 0.00019753,2.00000180,0.00008811,0.00005102,2.82842800,0.00000042,
+                              -2.00573917,-0.00019327,-11.68503206,-2.96763066,-0.00008324,-1.26233337).finished();
+
+const Eigen::Matrix<double,2,6> K_LQR_flat =
+(Eigen::Matrix<double,2,6>() << 0.05583848,1.99848059,0.06073569,-0.01385317,2.82808361,-0.00003223,
+                               -2.02804203,0.04591577,-14.39548208,-3.01641208,0.00644680,-1.26263668).finished();
+
+const Eigen::Matrix<double,2,6> K_LQR_slow =
+(Eigen::Matrix<double,2,6>() << 0.03726171,1.99911627,-0.01966205,-0.01380690,2.82835311,-0.00007981,
+                               -2.03979814,0.03451304,-14.34819149,-3.02394335,0.01596123,-1.26248636).finished();
+
 // Thrust estimation MA
 double FZ_EST_N;
 double fz_est_raw;
 double fz_est;
 double fz_est_sum;
 
+// om estimation MA
+Eigen::Vector3d om_est_sum;
+double OM_EST_N;
+
 // Update variables
 int pose_up;
 int vel_up;
+
+// Controller gains
+double KX;
+double KV;
+double KP;
+double KY;
+
+void compute_cntrl_planar(const double fz_cmd, const double x_des, const double yaw_des, Eigen::Vector3d &ref_er){
+
+  // control to keep quad planar
+  // compute after lqr control
+
+  double x_ddot_des = -KX*(mea_pos(0)-x_des) - KV*mea_vel(0);
+
+  // set equal to -fz * sin(p)
+  double pitch_cmd = std::asin(-x_ddot_des/fz_cmd);
+
+  utils::om2er(mea_er,mea_wb,mea_eul);
+
+  // pitch command rate
+  double pitch_rate_nom = KX*mea_vel(0)/(fz_cmd*std::cos(pitch_cmd));
+
+  ref_er(1) = pitch_rate_nom + KP * (pitch_cmd - mea_eul(1));
+
+  // yaw command rate
+  ref_er(2) = KY * (yaw_des - mea_eul(2));
+
+}
 
 void state_cb(const mavros_msgs::State::ConstPtr& msg)
 {
@@ -74,6 +125,9 @@ void poseSubCB(const geometry_msgs::PoseStamped::ConstPtr& msg) {
   // Final conversion to rot matrix
   utils::quat2rotM(mea_q, mea_R);
 
+  // Conversion to Euler(123)
+  utils::rotM2Euler(mea_eul, mea_R);
+
   pose_up = 1;
 
 }
@@ -94,6 +148,9 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
   mea_wb(1) = -msg->twist.angular.y;
   mea_wb(2) = -msg->twist.angular.z;
 
+  om_est_sum += mea_wb - (om_est_sum/OM_EST_N);
+  mea_wb = om_est_sum/OM_EST_N;
+
   //update accel estimate
   Eigen::Vector3d acc = (mea_vel - vel_prev)/vel_dt;
   acc(2) += -9.8066;
@@ -109,7 +166,7 @@ void velSubCB(const geometry_msgs::TwistStamped::ConstPtr& msg) {
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "asl_traj_ctrl");
+  ros::init(argc, argv, "pvtol_traj_ctrl");
   ros::NodeHandle nh;
 
   // Subscriptions
@@ -135,26 +192,26 @@ int main(int argc, char **argv)
   ros::Publisher debug_pub8 = nh.advertise<std_msgs::Float64>("/debug8", 1);
   ros::Publisher debug_pub9 = nh.advertise<std_msgs::Float64>("/debug9", 1);
   ros::Publisher debug_pub10 = nh.advertise<std_msgs::Float64>("/debug10", 1);
-  ros::Publisher debug_pub11 = nh.advertise<std_msgs::Float64>("/debug11", 1);
-  ros::Publisher debug_pub12 = nh.advertise<std_msgs::Float64>("/debug12", 1);
-  ros::Publisher debug_pub13 = nh.advertise<std_msgs::Float64>("/debug13", 1);
-  ros::Publisher debug_pub14 = nh.advertise<std_msgs::Float64>("/debug14", 1);
-  ros::Publisher debug_pub15 = nh.advertise<std_msgs::Float64>("/debug15", 1);
-  ros::Publisher debug_pub16 = nh.advertise<std_msgs::Float64>("/debug16", 1);
-  ros::Publisher debug_pub17 = nh.advertise<std_msgs::Float64>("/debug17", 1);
   ros::Publisher debug_pub18 = nh.advertise<std_msgs::Float64>("/debug18", 1);
   ros::Publisher debug_pub19 = nh.advertise<std_msgs::Float64>("/debug19", 1);
   std_msgs::Float64 debug_msg;
 
-  // Define controller classes
-  ros::param::get("~FZ_EST_N", FZ_EST_N);
+  // Controller frequency
+  double CONTROL_DT = 1.0/250.0;
+  ros::Rate rate(1.0/CONTROL_DT);
+
   double FZ_CTRL_N = 1.0;
   ros::param::get("~FZ_CTRL_N", FZ_CTRL_N);
   CCMController ctrl(FZ_CTRL_N);
 
-  // Get desired Z height
-  double Z_INIT_DES;
-  ros::param::get("~Z_INIT", Z_INIT_DES);
+  // Controller gains
+  ros::param::get("~KX", KX);
+  ros::param::get("~KV", KV);
+  ros::param::get("~KP", KP);
+  ros::param::get("~KY", KY);
+
+  double K_LQR_SCALE = 1.0;
+  ros::param::get("~K_LQR_SCALE", K_LQR_SCALE);
 
   // Define trajectory class
   std::string traj_type;
@@ -164,6 +221,8 @@ int main(int argc, char **argv)
   ros::param::get("~START_DELAY", start_delay);
 
   Trajectory* traj;
+
+  // NOTE: NO AUTO TAKEOFF
 
   if (traj_type == "CIRCLE") {
 
@@ -188,34 +247,30 @@ int main(int argc, char **argv)
     ros::param::get("~RADIUS_Y", radius_y);
     traj = new Fig8Trajectory(radius_x, radius_y, 2.0*M_PI*(1.0/circle_T), start_delay);
 
-  } else if (traj_type == "SWOOP") {
+  } else if (traj_type == "NLP") {
 
-    double swoop_ybar, swoop_delta1, swoop_delta2, swoop_zbar;
-    ros::param::get("~YBAR", swoop_ybar);
-    ros::param::get("~DELTA1", swoop_delta1);
-    ros::param::get("~DELTA2", swoop_delta2);
-    ros::param::get("~ZBAR", swoop_zbar);
+    traj = new NLPTrajectory(6,2,CONTROL_DT);
 
-    traj = new SwoopTrajectory(swoop_ybar, swoop_delta1, swoop_delta2, swoop_zbar, start_delay);
-
-    Z_INIT_DES = swoop_zbar - pow(swoop_delta1,2.0);
-
-  } else {
+  } else  {
 
     traj = new HoverTrajectory();
 
   }
 
-  // Takeoff params
+  // Define takeoff params
+  double Z_INIT_DES;
+  ros::param::get("~Z_INIT", Z_INIT_DES);
   double TAKEOFF_HGT;
+
   double TAKEOFF_TIME;
-  ros::param::get("~TAKEOFF_TIME", TAKEOFF_TIME);
+  ros::param::get("~TAKEOFF_TIME",TAKEOFF_TIME);
 
-  bool DO_TAKEOFF;
-  ros::param::get("~DO_TAKEOFF", DO_TAKEOFF);
+  double START_DELAY;
+  ros::param::get("~START_DELAY",START_DELAY);
 
-  // Controller frequency
-  ros::Rate rate(250.0);
+  double YAW_INIT;
+
+  Eigen::Vector3d takeoff_loc;
 
   // Tracking status variables
   bool traj_started = false;
@@ -223,33 +278,48 @@ int main(int argc, char **argv)
   double time_traj = 0.0;
   double dt = 0.0;
 
-  // Reference values
-  double yaw_des = 0.0;
-  double yaw_init = 0.0;
-  ros::param::get("~YAW_INIT", yaw_init);
-
-  double yaw_dot_des = 0.0;
+  // Reference for CCM controller
   Eigen::Vector3d r_pos(0, 0, 0);
   Eigen::Vector3d r_vel(0, 0, 0);
   Eigen::Vector3d r_acc(0, 0, 0);
   Eigen::Vector3d r_jer(0, 0, 0);
-  Eigen::Vector3d takeoff_loc(0, 0, 0);
+
+  // Reference for PVTOL controller
+  double x_des = 0.0; //x_dot_des = 0
+  double yaw_des = 0.0; //yaw_dot_des = 0
+
+  Eigen::VectorXd _state_nom(6); //y,z,phi,y_dot,z_dot,phi_dot
+  _state_nom.setZero();
+  Eigen::Vector2d _ctrl_nom;
+  _ctrl_nom.setZero();
+
+  int ind_seg = 1;
+  Eigen::MatrixXd K_LQR(2,6);
+
+  Eigen::VectorXd _state(6);
 
   // Estimator values
+  ros::param::get("~FZ_EST_N", FZ_EST_N);
+  ros::param::get("~OM_EST_N", OM_EST_N);
+
+
   fz_est = 9.8066;
   fz_est_sum = fz_est * FZ_EST_N;
   Eigen::Vector3d euler;
   vel_prev_t = 0.0;
   mea_q.setZero();
   mea_R = Eigen::Matrix3d::Identity();
+  mea_eul.setZero();
   mea_wb.setZero();
+  om_est_sum.setZero();
+  mea_er.setZero();
   mea_pos.setZero();
   mea_vel.setZero();
+  Eigen::Vector3d vb(0.0,0.0,0.0);
   vel_prev.setZero();
 
   // Command values
   Eigen::Vector3d ref_er(0,0,0);
-  Eigen::Vector3d ref_om(0,0,0);
   double fz_cmd = 9.8066;
 
   while(ros::ok()) {
@@ -257,30 +327,30 @@ int main(int argc, char **argv)
     ros::spinOnce();
 
     // Publish tracking results
-    debug_msg.data = r_pos(0);
+    debug_msg.data = x_des;
     debug_pub1.publish(debug_msg);
     debug_msg.data = mea_pos(0);
     debug_pub2.publish(debug_msg);
 
-    debug_msg.data = r_pos(1);
+    debug_msg.data = _state_nom(0);
     debug_pub3.publish(debug_msg);
     debug_msg.data = mea_pos(1);
     debug_pub4.publish(debug_msg);
 
-    debug_msg.data = r_pos(2);
+    debug_msg.data = _state_nom(1);
     debug_pub5.publish(debug_msg);
     debug_msg.data = mea_pos(2);
     debug_pub6.publish(debug_msg);
 
-    debug_msg.data = mea_vel(0);
+    debug_msg.data = _state_nom(2);
     debug_pub7.publish(debug_msg);
-    debug_msg.data = mea_vel(1);
-    debug_pub8.publish(debug_msg);
-    debug_msg.data = mea_vel(2);
-    debug_pub9.publish(debug_msg);
 
-    // Get commanded normalized thrust
-    fz_cmd = ctrl.getfz();
+    debug_msg.data = mea_eul(0);
+    debug_pub8.publish(debug_msg);
+    debug_msg.data = mea_eul(1);
+    debug_pub9.publish(debug_msg);
+    debug_msg.data = mea_eul(2);
+    debug_pub10.publish(debug_msg);
 
     debug_msg.data = fz_cmd;
     debug_pub18.publish(debug_msg);
@@ -296,75 +366,131 @@ int main(int argc, char **argv)
       // update trajectory status variables
       if (!traj_started){
 
-          traj_started = true;
-          ctrl.setMode(traj_started);
+        traj_started = true;
+        ctrl.setMode(traj_started);
 
-          time_traj = 0.0;
+        time_traj = 0.0;
 
-          ROS_INFO("offboard started");
+        ROS_INFO("offboard started");
 
-          // set takeoff location
-          takeoff_loc << mea_pos(0), mea_pos(1), mea_pos(2);
-          ROS_INFO("takeoff loc: (%.3f,%.3f,%.3f)",mea_pos(0),mea_pos(1),mea_pos(2));
+        // set takeoff location
+        takeoff_loc << mea_pos(0), mea_pos(1), mea_pos(2);
+        ROS_INFO("takeoff loc: (%.3f,%.3f,%.3f)",mea_pos(0),mea_pos(1),mea_pos(2));
 
-          // initialize ref pos
-          r_pos = takeoff_loc;
-          TAKEOFF_HGT = takeoff_loc(2)-Z_INIT_DES;
+        // initialize ref pos
+        x_des = takeoff_loc(0);
+        _state_nom(0) = mea_pos(1);
+        _state_nom(1) = mea_pos(2);
+        TAKEOFF_HGT = mea_pos(2)-Z_INIT_DES;
 
-          // Give initial ref vel only if doing takeoff
-          if (DO_TAKEOFF) {  r_vel << 0.0, 0.0, -(TAKEOFF_HGT/TAKEOFF_TIME);}
+        r_pos = takeoff_loc;
 
-          // set start point for trajectory
-          if (DO_TAKEOFF) {
-            // if doing takeoff, start point is hover point above takeoff
-            traj->set_start_pos(takeoff_loc + Eigen::Vector3d(0.0,0.0,-TAKEOFF_HGT));
-          } else {
-            // else start point is offboard init location
-            traj->set_start_pos(takeoff_loc);
-          }
+        YAW_INIT = mea_eul(2);
+        yaw_des = YAW_INIT;
+
+        // initialize takeoff velocity
+        _state_nom(4) = -(TAKEOFF_HGT/TAKEOFF_TIME);
+        r_vel << 0.0, 0.0, -(TAKEOFF_HGT/TAKEOFF_TIME);
+
+        // if doing takeoff, start point is hover point above takeoff
+        traj->set_start_pos(takeoff_loc + Eigen::Vector3d(0.0,0.0,-TAKEOFF_HGT));
+
       } else {
           time_traj += dt;
       }
     } else {
+
       //reset
       traj_started = false;
-      time_traj = 0.0;
       ctrl.setMode(traj_started);
-      r_vel.setZero(); r_acc.setZero(); r_jer.setZero();
+
+      time_traj = 0.0;
+
+      x_des = mea_pos(0);
+      _state_nom << mea_pos(1), mea_pos(2), 0.0, 0.0, 0.0, 0.0;
+      _ctrl_nom << GRAV, 0.0;
+
+      r_pos = mea_pos;
+      r_vel.setZero();
+
     }
 
-    // Compute nominal
-    if (time_traj >= TAKEOFF_TIME) {
-      // Once past takeoff time, start trajectory
-      // ROS_INFO("error: %.3f", (r_pos-mea_pos).norm());
-      traj->eval(time_traj-TAKEOFF_TIME+dt, r_pos, r_vel, r_acc, r_jer, yaw_des, yaw_dot_des);
+    if (time_traj > 0 && time_traj <= TAKEOFF_TIME) {
+      // in takeoff
 
-      // add offset
-      yaw_des += yaw_init;
+      r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
+
+      _state_nom(1) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
+      _ctrl_nom << GRAV, 0.0;
+
+      if (time_traj > 2.0){
+        yaw_des = YAW_INIT - YAW_INIT*(time_traj/TAKEOFF_TIME);
+      } else {
+        yaw_des = YAW_INIT;
+      }
+
+    } else if (time_traj > TAKEOFF_TIME && time_traj <= TAKEOFF_TIME+START_DELAY) {
+      // adjust yaw to zero
+
+      r_pos(2) = Z_INIT_DES;
+      r_vel.setZero();
+
+      _state_nom(1) = Z_INIT_DES;
+      _state_nom(4) = 0.0;
+
+      yaw_des = 0.0;
+
+    } else if (time_traj > TAKEOFF_TIME+START_DELAY){
+      // in main trajectory
+      yaw_des = 0.0;
+      traj->eval_explicit(time_traj+dt-(TAKEOFF_TIME+START_DELAY), _state_nom, _ctrl_nom, ind_seg);
 
     } else {
-      if (DO_TAKEOFF) {
-        // smooth takeoff
-        r_pos(2) = takeoff_loc(2)-(time_traj/TAKEOFF_TIME)*TAKEOFF_HGT;
 
-        yaw_des = yaw_init;
+      // use generic setpoint
+      x_des = mea_pos(0);
+      _state_nom << mea_pos(1), mea_pos(2), 0.0, 0.0, 0.0, 0.0;
+      _ctrl_nom << GRAV , 0.0;
 
-      }
+      r_pos = mea_pos;
+      r_vel.setZero();
+
     }
 
-    // Update controller internal state
-    ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
+    if (time_traj > TAKEOFF_TIME+START_DELAY) {
 
-    // Compute feedback
-    ctrl.calcCCM(yaw_des, yaw_dot_des, r_pos, r_vel, r_acc, r_jer);
+      // Use Learning controller
 
-    // get commands
-    fz_cmd = ctrl.getfz();
-    ref_er = ctrl.getEr();
-    ref_om = ctrl.getOm();
+      vb = mea_R.transpose() * mea_vel;
+      _state << mea_pos(1), mea_pos(2), mea_eul(0), vb(1), vb(2), mea_wb(0);
 
-    euler = ctrl.getEuler();
+      if (ind_seg ==1) {
+        K_LQR = K_LQR_ramp;
+      } else if (ind_seg==2){
+        K_LQR = K_LQR_flat;
+      } else {
+        K_LQR = K_LQR_slow;
+      }
 
+      K_LQR = K_LQR_SCALE*K_LQR;
+
+      fz_cmd = _ctrl_nom(0) + K_LQR.row(0).dot(_state - _state_nom);
+      fz_cmd = std::max(fz_cmd, 2.0);
+      ref_er(0) = _ctrl_nom(1) + K_LQR.row(1).dot(_state - _state_nom);
+
+      // Compute planar control
+      compute_cntrl_planar(fz_cmd, x_des, yaw_des, ref_er);
+
+    } else {
+
+      // Use CCM controller
+      ctrl.updateState(mea_pos, mea_R, mea_vel, mea_wb, fz_est, dt, pose_up, vel_up);
+      ctrl.calcCCM(yaw_des, 0.0, r_pos, r_vel, r_acc, r_jer);
+      fz_cmd = ctrl.getfz();
+      ref_er = ctrl.getEr();
+    }
+
+    // Publish commands
     att_sp.header.stamp = ros::Time::now();
     att_sp.type_mask = mavros_msgs::AttitudeTarget::IGNORE_ATTITUDE;
     att_sp.body_rate.x = ref_er(0);
@@ -372,26 +498,6 @@ int main(int argc, char **argv)
     att_sp.body_rate.z = ref_er(2);
     att_sp.thrust = std::min(1.0, std::max(0.0, 0.56 * (fz_cmd) / 9.8066));
     cmdPub.publish(att_sp);
-
-    // Publish
-    debug_msg.data = euler(0);
-    debug_pub10.publish(debug_msg);
-    debug_msg.data = euler(1);
-    debug_pub11.publish(debug_msg);
-    debug_msg.data = euler(2);
-    debug_pub12.publish(debug_msg);
-    debug_msg.data = ctrl.getYawNom();
-    debug_pub13.publish(debug_msg);
-
-    debug_msg.data = ref_er(0);
-    debug_pub14.publish(debug_msg);
-    debug_msg.data = mea_wb(0);
-    debug_pub15.publish(debug_msg);
-    debug_msg.data = mea_wb(1);
-    debug_pub16.publish(debug_msg);
-
-    debug_msg.data = ctrl.getE();
-    debug_pub17.publish(debug_msg);
 
     // Reset update
     pose_up = 0; vel_up = 0;

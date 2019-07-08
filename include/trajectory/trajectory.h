@@ -16,6 +16,8 @@ public:
 
 //  virtual void set_output(int index, double value) {};
   virtual void set_start_pos(const Eigen::Vector3d &_start_pos) {};
+
+  virtual void eval_explicit(double t, Eigen::VectorXd &_state_nom, Eigen::Vector2d &_cntrl_nom, int &ind_seg) {};
 };
 
 class HoverTrajectory: public Trajectory {
@@ -65,6 +67,7 @@ public:
 
 
 class PolyTrajectory: public Trajectory {
+  // Requires pre-stored matrix of poly coeffs for x,y,z,yaw & time breakpoints (direct load)
 private:
   Eigen::Vector3d start_pos;
   Eigen::VectorXd switch_time;
@@ -86,6 +89,54 @@ public:
             double &yaw, double &yaw_dot);
 
   void set_start_pos(const Eigen::Vector3d &_start_pos);
+
+};
+
+class SwoopTrajectory: public Trajectory {
+
+private:
+  Eigen::Vector3d start_pos;
+
+  double start_delay;
+  double y_bar;
+  double delta_1;
+  double delta_2;
+  double z_bar;
+
+public:
+  SwoopTrajectory(double _ybar, double _delta1, double _delta2, double _zbar, double _start_delay);
+  void eval(double t, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc, Eigen::Vector3d &jer,
+            double &yaw, double &yaw_dot);
+
+  void set_start_pos(const Eigen::Vector3d &_start_pos);
+
+};
+
+class NLPTrajectory: public Trajectory {
+  // Requires pre-stored matrix of Lagrange coefficients & total time (direct load)
+private:
+  Eigen::Vector3d start_pos;
+
+  int n;
+  int m;
+  int N;
+  double dt;
+  double t_end;
+
+  Eigen::VectorXd tau_grid; // normalized collocation nodes [-1,1]
+
+  // Lagrange Interpolation matrix
+  Eigen::MatrixXd Lagrange_interp;
+
+  // Lagrange computation
+  void compute_lagrange(const double t);
+
+public:
+  NLPTrajectory(int _n, int _m, double _dt);
+
+  void set_start_pos(const Eigen::Vector3d &_start_pos);
+
+  void eval_explicit(double t, Eigen::VectorXd &_state_nom, Eigen::Vector2d &_cntrl_nom, int &ind_seg);
 
 };
 
