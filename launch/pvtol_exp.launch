@@ -51,7 +51,7 @@
 		<param name="KV" value="6.0" />
 		<param name="KP" value="4.0" />
 		<param name="KY" value="4.0" />
-		<param name="K_LQR_SCALE" value="0.5" />
+		<param name="K_LQR_SCALE" value="1.0" />
 		<param name="YBAR" value="4.0" />
 		<param name="DELTA1" value="1.0" />
 		<param name="DELTA2" value="3.0" />

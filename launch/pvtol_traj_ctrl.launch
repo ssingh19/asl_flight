@@ -20,11 +20,13 @@
   		<param name="RADIUS_Y" value="0.7" />
   		<param name="POLY_SCALE" value="1.2"/>
   		<param name="FZ_EST_N" value="8.0" />
+  		<param name="OM_EST_N" value="7.0" />
   		<param name="FZ_CTRL_N" value="2.0" />
-  		<param name="KX" value="25.0" />
+      <param name="KX" value="25.0" />
   		<param name="KV" value="10.0" />
   		<param name="KP" value="10.0" />
   		<param name="KY" value="4.0" />
+  		<param name="K_LQR_SCALE" value="1.0" />
   		<param name="YBAR" value="4.0" />
   		<param name="DELTA1" value="1.0" />
   		<param name="DELTA2" value="3.0" />

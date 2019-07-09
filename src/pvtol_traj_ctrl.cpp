@@ -11,6 +11,7 @@
 
 #include <utils/utils.h>
 #include <trajectory/trajectory.h>
+#include <trajectory/nlp_coeffs.h>
 
 #include <control/ccmcontroller.h>
 #include <GeoProb/Geodesic.h>
@@ -34,17 +35,18 @@ static Eigen::Matrix<double,3,3> Rz_T =
                                -1.0, 0.0, 0.0,
                                 0.0, 0.0, 1.0).finished();
 
+
 const Eigen::Matrix<double,2,6> K_LQR_ramp =
-(Eigen::Matrix<double,2,6>() << 0.00019753,2.00000180,0.00008811,0.00005102,2.82842800,0.00000042,
-                              -2.00573917,-0.00019327,-11.68503206,-2.96763066,-0.00008324,-1.26233337).finished();
+(Eigen::Matrix<double,2,6>() << -0.082402,1.423293,-0.510851,-0.077668,2.225517,-0.151686,
+                                -1.402603,-0.078241,-5.638937,-2.096978,-0.140249,-2.689655).finished();
 
 const Eigen::Matrix<double,2,6> K_LQR_flat =
-(Eigen::Matrix<double,2,6>() << 0.05583848,1.99848059,0.06073569,-0.01385317,2.82808361,-0.00003223,
-                               -2.02804203,0.04591577,-14.39548208,-3.01641208,0.00644680,-1.26263668).finished();
+(Eigen::Matrix<double,2,6>() << 0.004742,1.137935,-0.412228,0.216654,2.489380,0.307755,
+                              -1.435149,-0.040185,-5.885191,-1.801157,-0.082870,-2.379801).finished();
 
 const Eigen::Matrix<double,2,6> K_LQR_slow =
-(Eigen::Matrix<double,2,6>() << 0.03726171,1.99911627,-0.01966205,-0.01380690,2.82835311,-0.00007981,
-                               -2.03979814,0.03451304,-14.34819149,-3.02394335,0.01596123,-1.26248636).finished();
+(Eigen::Matrix<double,2,6>() << 0.003505,1.141416,-0.435992,0.195134,2.470314,0.293488,
+                              -1.435852,-0.033932,-5.857074,-1.792798,-0.100479,-2.403797).finished();
 
 // Thrust estimation MA
 double FZ_EST_N;
@@ -213,6 +215,16 @@ int main(int argc, char **argv)
   double K_LQR_SCALE = 1.0;
   ros::param::get("~K_LQR_SCALE", K_LQR_SCALE);
 
+  // Initialize LQR gain
+  // Eigen::VectorXd K_lqr_row_1(6);
+  // Eigen::VectorXd K_lqr_row_2(6);
+  // K_lqr_row_1.setZero();
+  // K_lqr_row_2.setZero();
+
+  // LQR* lqr_t = new LQR(NLP_T);
+  Eigen::MatrixXd K_LQR(2,6);
+
+
   // Define trajectory class
   std::string traj_type;
   ros::param::get("~TRAJ", traj_type);
@@ -292,9 +304,7 @@ int main(int argc, char **argv)
   _state_nom.setZero();
   Eigen::Vector2d _ctrl_nom;
   _ctrl_nom.setZero();
-
   int ind_seg = 1;
-  Eigen::MatrixXd K_LQR(2,6);
 
   Eigen::VectorXd _state(6);
 
@@ -463,6 +473,15 @@ int main(int argc, char **argv)
 
       vb = mea_R.transpose() * mea_vel;
       _state << mea_pos(1), mea_pos(2), mea_eul(0), vb(1), vb(2), mea_wb(0);
+
+      // Get time-varying LQR gains
+      // lqr_t->eval(time_traj+dt-(TAKEOFF_TIME+START_DELAY),
+                  // ind_seg, K_lqr_row_1, K_lqr_row_2);
+
+      // fz_cmd = _ctrl_nom(0) + K_LQR_SCALE * K_lqr_row_1.dot(_state - _state_nom);
+      // fz_cmd = std::max(fz_cmd, 2.0);
+      // ref_er(0) = _ctrl_nom(1) + K_LQR_SCALE * K_lqr_row_2.dot(_state - _state_nom);
+
 
       if (ind_seg ==1) {
         K_LQR = K_LQR_ramp;
